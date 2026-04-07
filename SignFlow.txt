@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>SignFlow | Smart eSignature Platform</title>
+  <!-- Tailwind + Font Awesome + Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .document-container { background: white; box-shadow: 0 20px 35px -12px rgba(0,0,0,0.1); transition: all 0.2s ease; }
+    .signature-field { transition: all 0.15s ease; cursor: pointer; backdrop-filter: blur(2px); background: rgba(255,255,240,0.9); border: 2px dashed #3b82f6; border-radius: 12px; padding: 6px 10px; min-width: 120px; text-align: center; font-size: 12px; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.05); z-index: 20; }
+    .signature-field.signed { border: 2px solid #10b981; background: #f0fdf4; }
+    .audit-entry { border-left: 3px solid #3b82f6; transition: all 0.1s; }
+    .btn-primary { background: linear-gradient(105deg, #2563eb 0%, #1e40af 100%); }
+    .draw-canvas { border: 2px solid #e2e8f0; border-radius: 16px; cursor: crosshair; background: white; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .page-transition { transition: opacity 0.2s ease; }
+    .pricing-card:hover { transform: translateY(-4px); transition: all 0.2s ease; }
+    .template-card { transition: all 0.2s; }
+    .template-card:hover { background: #f8fafc; border-color: #3b82f6; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-gray-100">
+
+  <!-- APP ROOT -->
+  <div id="appRoot" class="min-h-screen flex flex-col"></div>
+
+  <!-- Signature Modal -->
+  <div id="signatureModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-2xl overflow-hidden">
+      <div class="bg-gray-50 px-5 py-3 border-b flex justify-between"><h3 class="font-bold"><i class="fas fa-pen-fancy text-blue-600"></i> Sign Field</h3><button id="closeModalBtn" class="text-gray-400"><i class="fas fa-times"></i></button></div>
+      <div class="p-5"><p class="text-sm">Signer: <span id="modalSignerName" class="font-semibold"></span></p>
+        <div class="flex border-b mb-3 gap-3"><button id="typedTabBtn" class="py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">✍️ Type</button><button id="drawTabBtn" class="py-2 text-sm text-gray-500">🎨 Draw</button></div>
+        <div id="typedPanel"><input type="text" id="typedSignatureInput" class="w-full border rounded-xl p-3 text-lg" placeholder="Full name" style="font-family:'Brush Script MT',cursive"><button id="applyTypedBtn" class="mt-3 w-full bg-blue-600 text-white py-2 rounded-xl">Apply</button></div>
+        <div id="drawPanel" class="hidden"><canvas id="signCanvas" width="400" height="150" class="draw-canvas w-full h-auto border rounded-xl"></canvas><div class="flex gap-2 mt-3"><button id="clearCanvasBtn" class="bg-gray-200 px-3 py-1 rounded-lg">Clear</button><button id="applyDrawBtn" class="flex-1 bg-blue-600 text-white py-1 rounded-lg">Save Drawing</button></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="addModeBadge" class="hidden fixed bottom-6 right-6 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm z-40"><i class="fas fa-hand-pointer"></i> Add mode active</div>
+
+  <script>
+    // ----------------------- STATE & GLOBAL -----------------------
+    let currentUser = null;          // { email, plan: 'free' or 'unlimited', docsRemaining: 3 }
+    let activePage = 'home';         // home, dashboard, pricing, about, privacy, terms, login, signup, templates, bulk
+    let signatureFields = [];
+    let signers = [];
+    let auditLog = [];
+    let addFieldMode = false;
+    let currentFieldIdForModal = null;
+    let drawing = false;
+    let canvasCtx = null, canvasEl = null;
+    let currentDrawDataUrl = null;
+    let currentDocId = null;
+    
+    // NEW: Templates storage
+    let templates = [
+      { id: 't1', name: 'NDA Agreement', fields: [{ leftPercent: 35, topPercent: 55 }, { leftPercent: 65, topPercent: 55 }], signerCount: 2 },
+      { id: 't2', name: 'Sales Contract', fields: [{ leftPercent: 40, topPercent: 70 }, { leftPercent: 60, topPercent: 70 }], signerCount: 2 },
+      { id: 't3', name: 'Service Agreement', fields: [{ leftPercent: 45, topPercent: 65 }], signerCount: 1 }
+    ];
+    
+    // NEW: Reminder & Expiration settings for current document
+    let reminderSettings = { enabled: false, daysBefore: 3, expirationDays: 7, reminderSent: false };
+    let expirationTimer = null;
+    
+    // NEW: Bulk send queue (simulate multiple recipients)
+    let bulkQueue = []; // { email, name, status }
+    
+    // API readiness flag (mock endpoints)
+    let apiReady = true;
+    
+    // Helper: update UI & re-render
+    function setActivePage(page, pushState = true) {
+      activePage = page;
+      renderApp();
+      if (pushState) window.history.pushState({ page }, '', `#${page}`);
+    }
+
+    function requireAuth(callback) {
+      if (currentUser) callback();
+      else { setActivePage('login'); alert('Please sign in to access the document workspace.'); }
+    }
+
+    function handleSignup(email, password, plan = 'free') {
+      if (!email) return false;
+      currentUser = { email, plan: plan, docsRemaining: (plan === 'free' ? 3 : Infinity), documentsSigned: 0 };
+      signatureFields = [];
+      signers = [{ id: "s1", name: currentUser.email.split('@')[0], email: currentUser.email }];
+      auditLog = [];
+      reminderSettings = { enabled: false, daysBefore: 3, expirationDays: 7, reminderSent: false };
+      addAudit(`Welcome ${currentUser.email}! Free tier: ${currentUser.docsRemaining === Infinity ? 'Unlimited' : currentUser.docsRemaining} documents remaining.`);
+      setActivePage('dashboard');
+      return true;
+    }
+
+    function handleLogin(email) {
+      if (!email) return false;
+      currentUser = { email, plan: 'free', docsRemaining: 3, documentsSigned: 0 };
+      signers = [{ id: "s1", name: email.split('@')[0], email }];
+      signatureFields = [];
+      auditLog = [];
+      reminderSettings = { enabled: false, daysBefore: 3, expirationDays: 7, reminderSent: false };
+      addAudit(`Logged in as ${email}. Free tier: 3 free docs. Upgrade for unlimited.`);
+      setActivePage('dashboard');
+      return true;
+    }
+
+    function handleLogout() {
+      if (expirationTimer) clearTimeout(expirationTimer);
+      currentUser = null;
+      signatureFields = [];
+      signers = [];
+      auditLog = [];
+      addFieldMode = false;
+      setActivePage('home');
+    }
+
+    function upgradeToUnlimited() {
+      if (!currentUser) return;
+      currentUser.plan = 'unlimited';
+      currentUser.docsRemaining = Infinity;
+      addAudit(`✨ UPGRADED to Unlimited plan: flat monthly rate, unlimited document signatures.`);
+      alert('Thank you! You are now on the Unlimited plan. Flat monthly rate, unlimited signing.');
+      renderApp();
+    }
+
+    function addAudit(message, type = 'info') {
+      const entry = { timestamp: new Date().toLocaleString(), message, type };
+      auditLog.unshift(entry);
+      if (activePage === 'dashboard') renderDashboardContent();
+    }
+
+    function genId() { return Date.now() + '-' + Math.random().toString(36).substr(2, 6); }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+    // NEW: Template functions
+    function loadTemplate(templateId) {
+      const template = templates.find(t => t.id === templateId);
+      if (!template) return;
+      signatureFields = template.fields.map((f, idx) => ({
+        id: genId(),
+        signerId: signers[idx % signers.length]?.id || signers[0]?.id,
+        leftPercent: f.leftPercent,
+        topPercent: f.topPercent,
+        signedData: null,
+        status: 'pending'
+      }));
+      addAudit(`📋 Loaded template: ${template.name} with ${signatureFields.length} signature fields.`);
+      renderDashboardContent();
+    }
+    
+    // NEW: Reminder & Expiration logic
+    function setRemindersAndExpiration(enabled, daysBefore, expirationDays) {
+      reminderSettings = { enabled, daysBefore, expirationDays, reminderSent: false };
+      if (expirationTimer) clearTimeout(expirationTimer);
+      if (enabled && expirationDays > 0) {
+        expirationTimer = setTimeout(() => {
+          if (signatureFields.some(f => !f.signedData)) {
+            addAudit(`⏰ DOCUMENT EXPIRED: ${expirationDays} days passed without full signing.`, "warn");
+            alert(`Document has expired after ${expirationDays} days. Please create a new document.`);
+          }
+        }, expirationDays * 24 * 60 * 60 * 1000);
+        addAudit(`⏲️ Expiration set: ${expirationDays} days. Reminders: ${enabled ? `every ${daysBefore} days before expiry` : 'off'}`);
+      }
+      // Simulate reminder check
+      if (enabled && daysBefore > 0) {
+        const reminderInterval = setInterval(() => {
+          if (!currentUser) { clearInterval(reminderInterval); return; }
+          if (!reminderSettings.reminderSent && signatureFields.some(f => !f.signedData)) {
+            addAudit(`📧 REMINDER: ${daysBefore}-day reminder sent to pending signers.`, "info");
+            reminderSettings.reminderSent = true;
+          }
+        }, 10000); // Simulate reminder every 10 seconds for demo (in real: based on days)
+        setTimeout(() => clearInterval(reminderInterval), 60000);
+      }
+      renderDashboardContent();
+    }
+    
+    // NEW: Bulk send function
+    function openBulkSendModal() {
+      const emails = prompt("Enter comma-separated email addresses for bulk send:\ne.g., signer1@example.com, signer2@example.com");
+      if (!emails) return;
+      const emailList = emails.split(',').map(e => e.trim()).filter(e => e);
+      bulkQueue = emailList.map(email => ({ email, name: email.split('@')[0], status: 'pending' }));
+      addAudit(`📨 BULK SEND: Initiated to ${bulkQueue.length} recipients.`);
+      alert(`Bulk send initiated to ${bulkQueue.length} recipients. Each will receive a signing request.`);
+      // Simulate sending to first recipient
+      if (bulkQueue.length > 0) {
+        signers = bulkQueue.map((r, idx) => ({ id: genId(), name: r.name, email: r.email }));
+        addAudit(`✅ Bulk recipients added as signers.`);
+        renderDashboardContent();
+      }
+    }
+
+    // Document signing core logic
+    function addSignatureFieldAt(xPercent, yPercent) {
+      if (!addFieldMode) return false;
+      if (!signers.length) return false;
+      const defaultSigner = signers[0]?.id;
+      if (!defaultSigner) return false;
+      const newField = { id: genId(), signerId: defaultSigner, leftPercent: Math.min(90, Math.max(5, xPercent)), topPercent: Math.min(90, Math.max(5, yPercent)), signedData: null, status: 'pending' };
+      signatureFields.push(newField);
+      addAudit(`➕ Added signature field for ${signers.find(s=>s.id===defaultSigner)?.name}`);
+      renderDashboardContent();
+      return true;
+    }
+
+    function renderFieldsOnDocument(containerElement) {
+      if (!containerElement) return;
+      containerElement.innerHTML = '';
+      signatureFields.forEach(field => {
+        const signerObj = signers.find(s => s.id === field.signerId) || signers[0];
+        const isSigned = !!field.signedData;
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = `signature-field ${isSigned ? 'signed' : ''} absolute pointer-events-auto flex flex-col items-center justify-center`;
+        fieldDiv.style.left = `${field.leftPercent}%`;
+        fieldDiv.style.top = `${field.topPercent}%`;
+        fieldDiv.style.transform = 'translate(-50%, -50%)';
+        fieldDiv.style.minWidth = '130px';
+        let contentHtml = '';
+        if (isSigned) {
+          if (field.signedData.type === 'typed') contentHtml = `<div class="text-xs text-green-700 font-semibold">✓ Signed</div><div class="text-sm" style="font-family: 'Brush Script MT', cursive;">${field.signedData.html}</div>`;
+          else if (field.signedData.type === 'draw') contentHtml = `<div class="text-xs text-green-600">✍️ Signature</div><img src="${field.signedData.imgData}" style="max-height: 40px; max-width: 110px;" />`;
+        } else contentHtml = `<div class="text-xs font-semibold text-gray-500">🔏 Pending</div><div class="text-[11px]">${escapeHtml(signerObj.name)}</div>`;
+        fieldDiv.innerHTML = `<div class="flex justify-between w-full items-center gap-1 text-[10px] mb-1"><span class="bg-gray-200 px-1 rounded">${escapeHtml(signerObj.name.split(' ')[0])}</span><div class="flex gap-1">${!isSigned ? `<button class="sign-field-btn text-blue-600 hover:bg-blue-100 rounded-full w-5 h-5 flex items-center justify-center" data-id="${field.id}"><i class="fas fa-pen"></i></button>` : ''}<button class="delete-field-btn text-red-400 hover:text-red-700 rounded-full w-5 h-5 flex items-center justify-center" data-id="${field.id}"><i class="fas fa-times"></i></button></div></div><div class="text-center w-full">${contentHtml}</div>`;
+        containerElement.appendChild(fieldDiv);
+      });
+      document.querySelectorAll('.sign-field-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const id = btn.getAttribute('data-id'); openSignatureModal(id); }));
+      document.querySelectorAll('.delete-field-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const id = btn.getAttribute('data-id'); deleteFieldById(id); }));
+    }
+
+    function deleteFieldById(id) { signatureFields = signatureFields.filter(f => f.id !== id); addAudit(`Removed signature field`); renderDashboardContent(); }
+
+    function openSignatureModal(fieldId) {
+      const field = signatureFields.find(f => f.id === fieldId);
+      if (!field || field.signedData) return;
+      currentFieldIdForModal = fieldId;
+      const signer = signers.find(s => s.id === field.signerId) || signers[0];
+      document.getElementById('modalSignerName').innerText = signer.name;
+      document.getElementById('typedSignatureInput').value = signer.name;
+      if (canvasCtx && canvasEl) { canvasCtx.clearRect(0, 0, canvasEl.width, canvasEl.height); canvasCtx.fillStyle = "white"; canvasCtx.fillRect(0, 0, canvasEl.width, canvasEl.height); currentDrawDataUrl = null; }
+      document.getElementById('signatureModal').classList.remove('hidden');
+    }
+
+    function signFieldWithTyped() {
+      if (!currentFieldIdForModal) return;
+      const field = signatureFields.find(f => f.id === currentFieldIdForModal);
+      if (!field) return;
+      const typedValue = document.getElementById('typedSignatureInput').value.trim();
+      if (!typedValue) return alert("Enter signature");
+      field.signedData = { type: 'typed', html: typedValue };
+      addAudit(`✍️ Signed by ${signers.find(s=>s.id===field.signerId)?.name}`);
+      closeModal();
+      renderDashboardContent();
+      checkDocumentCompletion();
+    }
+
+    function signFieldWithDraw() {
+      if (!currentFieldIdForModal) return;
+      const field = signatureFields.find(f => f.id === currentFieldIdForModal);
+      if (!field || !currentDrawDataUrl) return alert("Draw signature first");
+      field.signedData = { type: 'draw', imgData: currentDrawDataUrl };
+      addAudit(`🖌️ Drew signature by ${signers.find(s=>s.id===field.signerId)?.name}`);
+      closeModal();
+      renderDashboardContent();
+      checkDocumentCompletion();
+    }
+
+    function checkDocumentCompletion() {
+      if (!currentUser) return;
+      const allSigned = signatureFields.length > 0 && signatureFields.every(f => f.signedData);
+      if (allSigned && signatureFields.length) {
+        if (currentUser.plan === 'free' && currentUser.docsRemaining > 0 && currentUser.docsRemaining !== Infinity) {
+          currentUser.docsRemaining -= 1;
+          currentUser.documentsSigned = (currentUser.documentsSigned || 0) + 1;
+          addAudit(`📄 Document fully signed! Free tier: ${currentUser.docsRemaining} document(s) left.`);
+          if (currentUser.docsRemaining === 0) alert("You've used all 3 free documents! Please upgrade to unlimited plan for continued signing.");
+          else alert("Document completed! Audit trail saved.");
+        } else if (currentUser.plan === 'unlimited') {
+          addAudit(`📄 Document fully signed (Unlimited plan).`);
+          alert("Document fully executed! Unlimited plan active.");
+        } else if (currentUser.plan === 'free' && currentUser.docsRemaining <= 0) {
+          addAudit(`⚠️ No free documents left. Please upgrade to continue.`, "warn");
+          alert("You have used your 3 free documents. Upgrade to unlimited plan to keep signing.");
+        } else { addAudit(`Document signed.`); alert("Document complete."); }
+      }
+    }
+
+    function closeModal() { document.getElementById('signatureModal')?.classList.add('hidden'); currentFieldIdForModal = null; }
+
+    function initCanvasDrawing() {
+      canvasEl = document.getElementById('signCanvas');
+      if (!canvasEl) return;
+      canvasCtx = canvasEl.getContext('2d');
+      function resizeAndClear() { canvasEl.width = canvasEl.parentElement.clientWidth - 20; canvasEl.height = 150; canvasCtx.fillStyle = "white"; canvasCtx.fillRect(0, 0, canvasEl.width, canvasEl.height); canvasCtx.strokeStyle = "#333"; canvasCtx.lineWidth = 2; canvasCtx.lineCap = "round"; }
+      resizeAndClear(); window.addEventListener('resize', () => resizeAndClear());
+      let drawingFlag = false;
+      function getCoords(e) { const rect = canvasEl.getBoundingClientRect(); const scaleX = canvasEl.width / rect.width; const scaleY = canvasEl.height / rect.height; let clientX, clientY; if (e.touches) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; } else { clientX = e.clientX; clientY = e.clientY; } let x = (clientX - rect.left) * scaleX; let y = (clientY - rect.top) * scaleY; return { x: Math.min(Math.max(0, x), canvasEl.width), y: Math.min(Math.max(0, y), canvasEl.height) }; }
+      function start(e) { drawingFlag = true; const pos = getCoords(e); canvasCtx.beginPath(); canvasCtx.moveTo(pos.x, pos.y); canvasCtx.lineTo(pos.x, pos.y); canvasCtx.stroke(); e.preventDefault(); }
+      function draw(e) { if (!drawingFlag) return; const pos = getCoords(e); canvasCtx.lineTo(pos.x, pos.y); canvasCtx.stroke(); canvasCtx.beginPath(); canvasCtx.moveTo(pos.x, pos.y); e.preventDefault(); }
+      function stop() { drawingFlag = false; canvasCtx.beginPath(); currentDrawDataUrl = canvasEl.toDataURL(); }
+      canvasEl.addEventListener('mousedown', start); canvasEl.addEventListener('mousemove', draw); canvasEl.addEventListener('mouseup', stop); canvasEl.addEventListener('touchstart', start); canvasEl.addEventListener('touchmove', draw); canvasEl.addEventListener('touchend', stop);
+      document.getElementById('clearCanvasBtn')?.addEventListener('click', () => { canvasCtx.clearRect(0, 0, canvasEl.width, canvasEl.height); canvasCtx.fillStyle = "white"; canvasCtx.fillRect(0, 0, canvasEl.width, canvasEl.height); currentDrawDataUrl = null; });
+    }
+
+    // ---------- RENDER FUNCTIONS ----------
+    function renderApp() {
+      const root = document.getElementById('appRoot');
+      if (!root) return;
+      const header = renderHeader();
+      let mainContent = '';
+      if (activePage === 'home') mainContent = renderHomePage();
+      else if (activePage === 'pricing') mainContent = renderPricingPage();
+      else if (activePage === 'about') mainContent = renderAboutPage();
+      else if (activePage === 'privacy') mainContent = renderPrivacyPage();
+      else if (activePage === 'terms') mainContent = renderTermsPage();
+      else if (activePage === 'login') mainContent = renderLoginPage();
+      else if (activePage === 'signup') mainContent = renderSignupPage();
+      else if (activePage === 'templates') mainContent = renderTemplatesPage();
+      else if (activePage === 'dashboard') mainContent = renderDashboard();
+      else mainContent = '<div class="p-10 text-center">404</div>';
+      const footer = renderFooter();
+      root.innerHTML = `<div class="flex flex-col min-h-screen">${header} <main class="flex-grow">${mainContent}</main> ${footer}</div>`;
+      attachGlobalEvents();
+      if (activePage === 'dashboard') { initDashboardEvents(); initCanvasDrawing(); }
+      if (activePage === 'dashboard' && addFieldMode) document.getElementById('addModeBadge')?.classList.remove('hidden');
+      const modal = document.getElementById('signatureModal');
+      if (modal && !modal.hasListener) { modal.hasListener = true; document.getElementById('closeModalBtn')?.addEventListener('click', closeModal); document.getElementById('applyTypedBtn')?.addEventListener('click', signFieldWithTyped); document.getElementById('applyDrawBtn')?.addEventListener('click', signFieldWithDraw); document.getElementById('typedTabBtn')?.addEventListener('click', () => { document.getElementById('typedPanel').classList.remove('hidden'); document.getElementById('drawPanel').classList.add('hidden'); }); document.getElementById('drawTabBtn')?.addEventListener('click', () => { document.getElementById('typedPanel').classList.add('hidden'); document.getElementById('drawPanel').classList.remove('hidden'); if(canvasCtx && canvasEl) canvasCtx.fillRect(0,0,canvasEl.width,canvasEl.height); }); }
+    }
+
+    function renderHeader() {
+      return `<header class="bg-white/80 backdrop-blur-md border-b sticky top-0 z-30"><div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3"><div class="flex items-center gap-2 cursor-pointer" onclick="window.dispatchEvent(new CustomEvent('navigate', {detail:'home'}))"><div class="bg-gradient-to-r from-blue-600 to-indigo-700 w-9 h-9 rounded-xl flex items-center justify-center shadow"><i class="fas fa-file-signature text-white text-lg"></i></div><span class="font-bold text-xl tracking-tight">SignFlow</span></div><div class="flex items-center gap-3 flex-wrap"><button data-nav="home" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Home</button><button data-nav="pricing" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Pricing</button><button data-nav="templates" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Templates</button><button data-nav="about" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">About</button>${currentUser ? `<span class="text-sm bg-blue-50 px-3 py-1 rounded-full"><i class="fas fa-user"></i> ${currentUser.email.split('@')[0]} | ${currentUser.plan === 'unlimited' ? '♾️ Unlimited' : `📄 ${currentUser.docsRemaining} left`}</span><button id="logoutBtn" class="text-sm bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300"><i class="fas fa-sign-out-alt"></i> Logout</button><button data-nav="dashboard" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm shadow">📄 Dashboard</button>` : `<button data-nav="login" class="text-gray-700 text-sm font-medium">Sign In</button><button data-nav="signup" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm shadow">Start Free</button>`}</div></div></header>`;
+    }
+
+    function renderFooter() { return `<footer class="bg-white border-t mt-12"><div class="max-w-7xl mx-auto px-4 py-6 text-xs text-gray-500 flex flex-wrap justify-between"><div>© 2026 SignFlow Inc. eSignature & Audit Trail | <i class="fas fa-code"></i> API Ready</div><div class="flex gap-4"><button data-nav="about" class="hover:text-blue-600">About</button><button data-nav="privacy" class="hover:text-blue-600">Privacy</button><button data-nav="terms" class="hover:text-blue-600">Terms</button></div></div></footer>`; }
+
+    function renderHomePage() { return `<div class="max-w-6xl mx-auto px-4 py-12"><div class="text-center"><h1 class="text-5xl font-extrabold bg-gradient-to-r from-blue-800 to-indigo-600 bg-clip-text text-transparent">Sign Smarter, Faster, Legally</h1><p class="text-gray-600 text-lg mt-4 max-w-2xl mx-auto">Audit-ready eSignatures with multi-signer workflows, real-time trails, and free tier.</p><div class="mt-8 flex gap-4 justify-center"><button data-nav="signup" class="btn-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg">Get Started Free → 3 free documents</button><button data-nav="pricing" class="border border-gray-300 px-6 py-3 rounded-xl font-medium">View Unlimited Plans</button></div><div class="mt-16 grid md:grid-cols-4 gap-6 text-left"><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-check-circle text-green-500 text-2xl"></i><h3 class="font-bold mt-3">3 Documents Free</h3><p>No credit card required.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-infinity text-blue-600 text-2xl"></i><h3 class="font-bold mt-3">Unlimited Monthly</h3><p>Flat rate, unlimited docs.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-gavel text-amber-600 text-2xl"></i><h3 class="font-bold mt-3">Legal Audit Trail</h3><p>Court-admissible logs.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-layer-group text-purple-600 text-2xl"></i><h3 class="font-bold mt-3">Templates + Bulk</h3><p>Save time with reusable docs.</p></div></div></div></div>`; }
+
+    function renderPricingPage() { return `<div class="max-w-6xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold text-center">Simple, Transparent Pricing</h2><div class="grid md:grid-cols-2 gap-8 mt-10 max-w-3xl mx-auto"><div class="bg-white rounded-2xl shadow-md p-6 text-center pricing-card"><i class="fas fa-gift text-4xl text-blue-500"></i><h3 class="text-2xl font-bold mt-2">Free Starter</h3><p class="text-gray-500">$0 / forever</p><ul class="mt-4 space-y-2 text-sm"><li>✓ 3 free documents to sign</li><li>✓ Audit trail included</li><li>✓ Templates + Bulk Send</li><li>✓ Reminders & Expiration</li></ul><button data-nav="signup" class="mt-6 w-full bg-blue-50 text-blue-700 py-2 rounded-xl font-semibold">Start Free</button></div><div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-md p-6 text-center pricing-card border-2 border-indigo-200"><i class="fas fa-rocket text-4xl text-indigo-600"></i><h3 class="text-2xl font-bold mt-2">Unlimited Pro</h3><p class="text-gray-500">$29 / month <span class="text-xs">flat rate</span></p><ul class="mt-4 space-y-2 text-sm"><li>✓ Unlimited documents & signatures</li><li>✓ Advanced Templates + API</li><li>✓ Bulk Send + Automation</li><li>✓ Priority support</li></ul><button id="upgradeUnlimitedBtn" class="mt-6 w-full btn-primary text-white py-2 rounded-xl font-semibold shadow">Upgrade to Unlimited</button></div></div><div class="mt-10 text-center text-sm text-gray-500">All plans include ESIGN-compliant signatures & encrypted audit logs.</div></div>`; }
+
+    function renderAboutPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">About SignFlow</h2><p class="mt-4 text-gray-700">We believe signing documents should be seamless, secure, and accessible. Our platform provides enterprise-grade eSignature with a consumer-friendly experience. First 3 documents free, then unlimited flat-rate plan.</p><div class="mt-6 bg-white p-5 rounded-xl"><i class="fas fa-shield-alt text-green-600"></i> <span class="font-semibold">Legal foundation:</span> ESIGN Act, eIDAS compliant. Every signature timestamped and logged.</div><div class="mt-4 bg-gray-50 p-4 rounded-xl"><i class="fas fa-code"></i> <strong>API Ready:</strong> REST endpoints available for integration. Webhooks supported.</div></div>`; }
+    function renderPrivacyPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Privacy Policy</h2><div class="prose mt-4 text-gray-600 space-y-3"><p>We collect email and signature data to facilitate contracts. Data encrypted at rest. We never sell personal data. Audit logs retained for 7 years.</p><p>You may request deletion of your account and associated signatures.</p></div></div>`; }
+    function renderTermsPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Terms & Conditions</h2><div class="prose mt-4 text-gray-600"><p>By using SignFlow, you agree that electronic signatures have legal effect. Free tier limited to 3 documents. Unlimited plan billed monthly. No refunds for partial months.</p><p>We reserve the right to modify pricing with 30-day notice.</p></div></div>`; }
+    function renderLoginPage() { return `<div class="max-w-md mx-auto px-4 py-16"><div class="bg-white rounded-2xl shadow-xl p-8"><h2 class="text-2xl font-bold">Sign in</h2><input type="email" id="loginEmail" placeholder="Email address" class="w-full border rounded-xl p-3 mt-4"><button id="doLoginBtn" class="w-full btn-primary text-white py-3 rounded-xl mt-4 font-semibold">Continue</button><p class="text-center mt-4 text-sm">No account? <button data-nav="signup" class="text-blue-600">Start free trial</button></p></div></div>`; }
+    function renderSignupPage() { return `<div class="max-w-md mx-auto px-4 py-16"><div class="bg-white rounded-2xl shadow-xl p-8"><h2 class="text-2xl font-bold">Create free account</h2><p class="text-gray-500 text-sm">First 3 documents free — then upgrade anytime.</p><input type="email" id="signupEmail" placeholder="Email" class="w-full border rounded-xl p-3 mt-4"><button id="doSignupBtn" class="w-full btn-primary text-white py-3 rounded-xl mt-4 font-semibold">Start signing → 3 free docs</button><p class="text-center text-xs mt-4">By signing up you agree to Terms & Privacy.</p></div></div>`; }
+    
+    function renderTemplatesPage() {
+      return `<div class="max-w-6xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Document Templates</h2><p class="text-gray-600 mt-2">Save time by reusing signature field layouts.</p><div class="grid md:grid-cols-3 gap-6 mt-8">${templates.map(t => `<div class="bg-white rounded-xl shadow-sm p-5 template-card border border-gray-200 cursor-pointer" data-template-id="${t.id}"><i class="fas fa-file-alt text-blue-500 text-2xl"></i><h3 class="font-bold text-lg mt-2">${t.name}</h3><p class="text-xs text-gray-500">${t.fields.length} signature fields, ${t.signerCount} signer(s)</p><button class="use-template-btn mt-3 text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full" data-id="${t.id}">Use this template</button></div>`).join('')}</div><div class="mt-8 bg-blue-50 p-4 rounded-xl"><i class="fas fa-rocket"></i> Pro tip: Load a template, then customize fields on the dashboard.</div></div>`;
+    }
+
+    function renderDashboard() {
+      if (!currentUser) return '<div class="p-10 text-center">Please login</div>';
+      const remainingText = currentUser.plan === 'unlimited' ? 'Unlimited' : (currentUser.docsRemaining === Infinity ? '∞' : currentUser.docsRemaining);
+      return `<div class="max-w-7xl mx-auto px-4 py-6"><div class="flex flex-wrap justify-between items-center mb-4"><div><h2 class="text-2xl font-bold">Document Workspace</h2><p class="text-sm text-gray-500">Plan: ${currentUser.plan === 'unlimited' ? '♾️ Unlimited Monthly' : `🎁 Free (${currentUser.docsRemaining} of 3 docs left)`}</p></div><div class="flex gap-2">${currentUser.plan !== 'unlimited' ? `<button id="upgradeFromDashboard" class="bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full text-sm font-semibold"><i class="fas fa-bolt"></i> Upgrade to Unlimited ($29/mo)</button>` : ''}<button id="bulkSendBtn" class="bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-envelope-open-text"></i> Bulk Send</button></div></div><div class="grid lg:grid-cols-12 gap-6"><div class="lg:col-span-3 bg-white rounded-2xl p-4 shadow-sm"><h3 class="font-bold flex gap-2"><i class="fas fa-users"></i> Signers</h3><div id="signersList" class="mt-2 space-y-2 max-h-48 overflow-y-auto"></div><button id="addSignerBtn" class="text-xs bg-gray-100 w-full mt-2 py-1 rounded-lg">+ Add Signer</button><div class="mt-4"><h3 class="font-bold text-sm">Reminders & Expiry</h3><div class="mt-2 text-xs"><label class="flex items-center gap-2"><input type="checkbox" id="reminderEnableCheckbox"> Enable reminders</label><div class="mt-1"><span>Remind before (days):</span><input type="number" id="reminderDays" value="3" class="border rounded w-16 text-center mx-1" min="1" max="10"></div><div><span>Expire after (days):</span><input type="number" id="expirationDays" value="7" class="border rounded w-16 text-center mx-1" min="1" max="30"></div><button id="applyReminderBtn" class="mt-2 bg-gray-200 px-2 py-1 rounded text-xs">Apply Settings</button></div></div><div class="mt-4"><h3 class="font-bold text-sm">Audit Trail</h3><div id="auditLogList" class="text-xs space-y-1 max-h-52 overflow-y-auto mt-1 bg-gray-50 p-2 rounded"></div></div></div><div class="lg:col-span-6"><div class="bg-white rounded-2xl shadow-lg border"><div class="bg-gray-50 px-4 py-2 border-b flex justify-between"><span class="font-medium"><i class="fas fa-file"></i> Agreement.pdf</span><button id="toggleAddModeBtn" class="text-xs bg-blue-100 px-3 py-1 rounded-full"><i class="fas fa-plus"></i> Add Field</button></div><div id="documentPreview" class="relative min-h-[480px] p-6 bg-white" style="background-image: radial-gradient(#e5e7eb 0.5px, transparent 0.5px); background-size: 18px 18px;"><div class="prose max-w-none text-sm pointer-events-none"><h2 class="font-bold">Service Contract</h2><p>This agreement between SignFlow and Client. By signing, you agree to terms.</p><div class="border-l-4 border-blue-200 pl-3 italic">Electronic signature valid.</div><p>Terms and conditions attached.</p></div><div id="dynamicFieldsContainer" class="absolute inset-0 p-6 pointer-events-none"></div></div><div class="bg-gray-50 px-4 py-2 text-xs flex justify-between"><span id="modeHint">Click 'Add Field' then click on document to place signature tag.</span><button id="resetDocumentBtn" class="text-red-500"><i class="far fa-trash-alt"></i> Clear fields</button></div></div></div><div class="lg:col-span-3 bg-white p-4 rounded-2xl shadow-sm"><h3 class="font-bold">Signature Fields</h3><div id="fieldsListPanel" class="space-y-2 mt-2 max-h-96 overflow-y-auto"></div><button id="sendDocBtn" class="w-full mt-4 btn-primary text-white py-2 rounded-xl font-semibold"><i class="fas fa-paper-plane"></i> Finalize & Send</button><div class="mt-3 text-center text-[10px] text-gray-400"><i class="fas fa-code"></i> API Ready — Webhooks supported</div></div></div></div>`;
+    }
+
+    function renderDashboardContent() { if (activePage !== 'dashboard') return; const signersContainer = document.getElementById('signersList'); if (signersContainer) signersContainer.innerHTML = signers.map(s => `<div class="flex justify-between bg-gray-100 p-1 rounded text-xs"><span>${escapeHtml(s.name)}</span><button class="remove-signer-dash text-red-400" data-id="${s.id}"><i class="fas fa-times-circle"></i></button></div>`).join(''); document.querySelectorAll('.remove-signer-dash').forEach(btn => btn.addEventListener('click', (e) => { const id = btn.getAttribute('data-id'); if (signatureFields.some(f=>f.signerId===id)) { alert("Remove fields first"); return; } signers = signers.filter(s=>s.id !== id); renderDashboardContent(); })); const auditDiv = document.getElementById('auditLogList'); if(auditDiv) auditDiv.innerHTML = auditLog.slice(0,8).map(l=>`<div class="border-l-2 border-blue-300 pl-1">${l.timestamp}: ${l.message}</div>`).join(''); const fieldsContainer = document.getElementById('dynamicFieldsContainer'); if(fieldsContainer) renderFieldsOnDocument(fieldsContainer); const fieldsPanel = document.getElementById('fieldsListPanel'); if(fieldsPanel) fieldsPanel.innerHTML = signatureFields.map(f=>`<div class="text-xs bg-gray-50 p-2 rounded flex justify-between"><span>${f.signedData ? '✅' : '⏳'} ${signers.find(s=>s.id===f.signerId)?.name}</span><button class="delete-field-panel text-red-500" data-id="${f.id}"><i class="fas fa-trash"></i></button></div>`).join(''); document.querySelectorAll('.delete-field-panel').forEach(btn=>btn.addEventListener('click',(e)=>{const id=btn.getAttribute('data-id');deleteFieldById(id);})); }
+
+    function initDashboardEvents() {
+      const container = document.getElementById('documentPreview'); if(!container) return;
+      const toggleBtn = document.getElementById('toggleAddModeBtn'); if(toggleBtn) toggleBtn.onclick = () => { addFieldMode = !addFieldMode; const badge = document.getElementById('addModeBadge'); if(badge) addFieldMode ? badge.classList.remove('hidden') : badge.classList.add('hidden'); document.getElementById('modeHint').innerHTML = addFieldMode ? '🔵 ADD MODE: click document to place field' : "Click 'Add Field' then click on document."; };
+      const upgradeBtn = document.getElementById('upgradeFromDashboard'); if(upgradeBtn) upgradeBtn.onclick = () => upgradeToUnlimited();
+      const sendBtn = document.getElementById('sendDocBtn'); if(sendBtn) sendBtn.onclick = () => { if(signatureFields.length === 0) alert('Add signature fields first'); else checkDocumentCompletion(); };
+      const resetBtn = document.getElementById('resetDocumentBtn'); if(resetBtn) resetBtn.onclick = () => { signatureFields = []; renderDashboardContent(); addAudit("Reset document fields."); };
+      const bulkBtn = document.getElementById('bulkSendBtn'); if(bulkBtn) bulkBtn.onclick = () => openBulkSendModal();
+      document.getElementById('addSignerBtn')?.addEventListener('click', () => { let name = prompt("Signer full name"); if(name) signers.push({ id: genId(), name, email: name.toLowerCase()+'@example.com' }); renderDashboardContent(); });
+      document.getElementById('applyReminderBtn')?.addEventListener('click', () => { const enabled = document.getElementById('reminderEnableCheckbox')?.checked || false; const days = parseInt(document.getElementById('reminderDays')?.value) || 3; const expiry = parseInt(document.getElementById('expirationDays')?.value) || 7; setRemindersAndExpiration(enabled, days, expiry); });
+      container.addEventListener('click', (e) => { if(!addFieldMode) return; const rect = document.getElementById('dynamicFieldsContainer').getBoundingClientRect(); const x = ((e.clientX - rect.left)/rect.width)*100; const y = ((e.clientY - rect.top)/rect.height)*100; if(x>=0 && x<=100 && y>=0 && y<=100) addSignatureFieldAt(x,y); });
+      renderDashboardContent();
+    }
+
+    function attachGlobalEvents() {
+      document.querySelectorAll('.nav-link, [data-nav]').forEach(el => { if(!el.hasListener) { el.addEventListener('click', (e) => { const page = el.getAttribute('data-nav'); if(page) setActivePage(page); }); el.hasListener=true; } });
+      document.querySelectorAll('.use-template-btn, [data-template-id]').forEach(el => { if(!el.hasListener) { el.addEventListener('click', (e) => { const tid = el.getAttribute('data-id') || el.getAttribute('data-template-id'); if(tid && currentUser) { loadTemplate(tid); setActivePage('dashboard'); } else if(tid && !currentUser) alert('Please sign in first'); }); el.hasListener=true; } });
+      const logout = document.getElementById('logoutBtn'); if(logout && !logout.hasListener) { logout.addEventListener('click', handleLogout); logout.hasListener=true; }
+      const loginBtn = document.getElementById('doLoginBtn'); if(loginBtn) loginBtn.onclick = () => { const email = document.getElementById('loginEmail')?.value; if(email) handleLogin(email); else alert("Enter email"); };
+      const signupBtn = document.getElementById('doSignupBtn'); if(signupBtn) signupBtn.onclick = () => { const email = document.getElementById('signupEmail')?.value; if(email) handleSignup(email, 'pass', 'free'); else alert("Email required"); };
+      const upgradePricing = document.getElementById('upgradeUnlimitedBtn'); if(upgradePricing) upgradePricing.onclick = () => { if(currentUser) upgradeToUnlimited(); else alert("Please sign up first"); };
+    }
+
+    window.addEventListener('popstate', () => { const hash = window.location.hash.slice(1); if(hash) setActivePage(hash, false); else setActivePage('home', false); });
+    window.addEventListener('navigate', (e) => setActivePage(e.detail));
+    renderApp();
+  </script>
+</body>
+</html>
