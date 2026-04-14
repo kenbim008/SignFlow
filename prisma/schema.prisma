@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String
+  role              Role     @default(USER)
+  affiliateCode     String   @unique
+  referredById      String?
+  referredBy        User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals         User[]   @relation("Referrals")
+  planType          String   @default("free")
+  docsRemaining     Int      @default(3)
+  monthlyDocCount   Int      @default(0)
+  documentsSigned   Int      @default(0)
+  referralCount     Int      @default(0)
+  paidReferrals     Int      @default(0)
+  referralEarnings  Float    @default(0)
+  createdAt         DateTime @default(now())
+  documents         Document[]
+  referralEvents    Referral[] @relation("Referrer")
+  referredAs        Referral?  @relation("Referred")
+}
+
+model EmailOtp {
+  id        String     @id @default(cuid())
+  email     String
+  purpose   OtpPurpose
+  codeHash  String
+  expiresAt DateTime
+  meta      String?
+  createdAt DateTime   @default(now())
+
+  @@index([email, purpose])
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  filename     String
+  storedPath   String?
+  mimeType     String?
+  fieldData    String
+  sizeBytes    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  referrerId  String
+  referrer    User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId  String   @unique
+  referred    User     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  status      String   @default("pending")
+  plan        String?
+  earnings    Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([referrerId])
+}

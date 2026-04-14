@@ -1,0 +1,25 @@
+services:
+  signflow:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:./data/signflow.db"
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@signflow.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-SignFlow <noreply@localhost>}
+    volumes:
+      - signflow-data:/app/data
+      - signflow-uploads:/app/uploads
+
+volumes:
+  signflow-data:
+  signflow-uploads:
