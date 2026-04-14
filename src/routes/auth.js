@@ -7,6 +7,7 @@ import { generateAffiliateCode } from '../lib/affiliate.js';
 
 const router = Router();
 const OTP_TTL_MS = 10 * 60 * 1000;
+const bypassOtp = process.env.BYPASS_OTP === 'true';
 
 function randomOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -52,8 +53,9 @@ router.post('/signup/request', async (req, res) => {
       },
     });
 
-    await sendOtpEmail(em, otp, 'SIGNUP');
-    res.json({ ok: true, message: 'Verification code sent' });
+    if (!bypassOtp) await sendOtpEmail(em, otp, 'SIGNUP');
+    else console.log('[auth] BYPASS_OTP: signup email skipped for', em);
+    res.json({ ok: true, message: 'Verification code sent', bypassOtp });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
@@ -65,7 +67,7 @@ router.post('/signup/verify', async (req, res) => {
   try {
     const { email, code } = req.body || {};
     const em = String(email || '').trim().toLowerCase();
-    if (!em || !code) return res.status(400).json({ error: 'Email and code required' });
+    if (!em || (!bypassOtp && !code)) return res.status(400).json({ error: 'Email and code required' });
 
     const row = await prisma.emailOtp.findFirst({
       where: { email: em, purpose: 'SIGNUP' },
@@ -74,8 +76,9 @@ router.post('/signup/verify', async (req, res) => {
     if (!row || row.expiresAt < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired code' });
     }
-    const ok = await bcrypt.compare(String(code), row.codeHash);
-    if (!ok) return res.status(400).json({ error: 'Invalid code' });
+    const otpOk =
+      bypassOtp || (code && (await bcrypt.compare(String(code), row.codeHash)));
+    if (!otpOk) return res.status(400).json({ error: 'Invalid code' });
 
     let meta = {};
     try {
@@ -158,8 +161,9 @@ router.post('/login/request', async (req, res) => {
       },
     });
 
-    await sendOtpEmail(em, otp, 'LOGIN');
-    res.json({ ok: true, message: 'Verification code sent' });
+    if (!bypassOtp) await sendOtpEmail(em, otp, 'LOGIN');
+    else console.log('[auth] BYPASS_OTP: login email skipped for', em);
+    res.json({ ok: true, message: 'Verification code sent', bypassOtp });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
@@ -171,7 +175,7 @@ router.post('/login/verify', async (req, res) => {
   try {
     const { email, code } = req.body || {};
     const em = String(email || '').trim().toLowerCase();
-    if (!em || !code) return res.status(400).json({ error: 'Email and code required' });
+    if (!em || (!bypassOtp && !code)) return res.status(400).json({ error: 'Email and code required' });
 
     const row = await prisma.emailOtp.findFirst({
       where: { email: em, purpose: 'LOGIN' },
@@ -180,8 +184,9 @@ router.post('/login/verify', async (req, res) => {
     if (!row || row.expiresAt < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired code' });
     }
-    const ok = await bcrypt.compare(String(code), row.codeHash);
-    if (!ok) return res.status(400).json({ error: 'Invalid code' });
+    const otpOk =
+      bypassOtp || (code && (await bcrypt.compare(String(code), row.codeHash)));
+    if (!otpOk) return res.status(400).json({ error: 'Invalid code' });
 
     await prisma.emailOtp.delete({ where: { id: row.id } });
 
