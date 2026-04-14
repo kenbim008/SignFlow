@@ -19,10 +19,13 @@
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    .page-transition { transition: opacity 0.2s ease; }
-    .pricing-card:hover { transform: translateY(-4px); transition: all 0.2s ease; }
-    .template-card { transition: all 0.2s; }
-    .template-card:hover { background: #f8fafc; border-color: #3b82f6; }
+    .referral-stats-card { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
+    .tier-bronze { background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%); }
+    .tier-silver { background: linear-gradient(135deg, #a8a9ad 0%, #8a8d91 100%); }
+    .tier-gold { background: linear-gradient(135deg, #ffd700 0%, #daa520 100%); }
+    .tier-platinum { background: linear-gradient(135deg, #e5e4e2 0%, #b0b0b0 100%); }
+    .projection-table td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; }
+    .otp-input { letter-spacing: 8px; font-size: 24px; text-align: center; }
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-gray-100">
@@ -41,12 +44,63 @@
       </div>
     </div>
   </div>
+
+  <!-- OTP Verification Modal -->
+  <div id="otpModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-2xl overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4">
+        <h3 class="text-xl font-bold text-white"><i class="fas fa-key mr-2"></i>Verify Your Identity</h3>
+      </div>
+      <div class="p-6">
+        <p class="text-gray-600 text-sm mb-2">We've sent a 6-digit verification code to:</p>
+        <p class="font-semibold text-center text-lg mb-4" id="otpEmailDisplay">user@example.com</p>
+        <input type="text" id="otpCode" maxlength="6" placeholder="Enter 6-digit code" class="otp-input w-full border rounded-xl p-4 text-center text-2xl tracking-widest font-mono" autocomplete="off">
+        <div class="flex gap-3 mt-6">
+          <button id="verifyOtpBtn" class="flex-1 btn-primary text-white py-3 rounded-xl font-semibold">Verify</button>
+          <button id="resendOtpBtn" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300">Resend Code</button>
+        </div>
+        <p class="text-xs text-gray-400 text-center mt-4">Verification code expires in 10 minutes</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Affiliate Program Details Modal -->
+  <div id="affiliateModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 hidden transition-all">
+    <div class="bg-white rounded-2xl max-w-4xl w-full mx-4 shadow-2xl overflow-hidden max-h-[85vh] overflow-y-auto">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center sticky top-0">
+        <h3 class="text-xl font-bold text-white"><i class="fas fa-hand-holding-usd mr-2"></i>SignFlow Affiliate Program</h3>
+        <button id="closeAffiliateModalBtn" class="text-white hover:text-gray-200"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      <div class="p-6 space-y-6">
+        <div class="bg-blue-50 p-4 rounded-xl">
+          <p class="text-sm text-gray-700">Earn <strong class="text-blue-700">20-30% recurring commission</strong> for every customer you refer who upgrades to a paid SignFlow plan. No cap, lifetime earnings.</p>
+        </div>
+        <div><h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-chart-line text-green-600"></i> How It Works</h4>
+          <div class="grid md:grid-cols-3 gap-4 mt-3">
+            <div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">1</span><p class="text-xs mt-1">Share your unique referral link</p></div>
+            <div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">2</span><p class="text-xs mt-1">Friend signs up & upgrades to Pro/Enterprise</p></div>
+            <div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">3</span><p class="text-xs mt-1">You earn 20-30% monthly recurring commission</p></div>
+          </div>
+        </div>
+        <div><h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-trophy text-yellow-600"></i> Affiliate Tiers</h4>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+            <div class="bg-amber-50 p-3 rounded-lg text-center border border-amber-200"><div class="w-10 h-10 rounded-full tier-bronze mx-auto flex items-center justify-center text-white font-bold">B</div><p class="font-bold mt-1">Bronze</p><p class="text-xs">0-4 referrals</p><p class="text-xs text-green-600">20% commission</p></div>
+            <div class="bg-gray-50 p-3 rounded-lg text-center border border-gray-200"><div class="w-10 h-10 rounded-full tier-silver mx-auto flex items-center justify-center text-white font-bold">S</div><p class="font-bold mt-1">Silver</p><p class="text-xs">5-14 referrals</p><p class="text-xs text-green-600">22% commission</p></div>
+            <div class="bg-yellow-50 p-3 rounded-lg text-center border border-yellow-200"><div class="w-10 h-10 rounded-full tier-gold mx-auto flex items-center justify-center text-white font-bold">G</div><p class="font-bold mt-1">Gold</p><p class="text-xs">15-49 referrals</p><p class="text-xs text-green-600">25% commission</p></div>
+            <div class="bg-gray-100 p-3 rounded-lg text-center border border-gray-300"><div class="w-10 h-10 rounded-full tier-platinum mx-auto flex items-center justify-center text-gray-800 font-bold">P</div><p class="font-bold mt-1">Platinum</p><p class="text-xs">50+ referrals</p><p class="text-xs text-green-600">30% commission</p></div>
+          </div>
+        </div>
+        <button id="closeAffiliateModalFooterBtn" class="w-full bg-blue-600 text-white py-2 rounded-xl font-semibold">Got it</button>
+      </div>
+    </div>
+  </div>
+
   <div id="addModeBadge" class="hidden fixed bottom-6 right-6 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm z-40"><i class="fas fa-hand-pointer"></i> Add mode active</div>
 
   <script>
     // ----------------------- STATE & GLOBAL -----------------------
-    let currentUser = null;          // { email, plan: 'free' or 'unlimited', docsRemaining: 3 }
-    let activePage = 'home';         // home, dashboard, pricing, about, privacy, terms, login, signup, templates, bulk
+    let currentUser = null;
+    let activePage = 'home';
     let signatureFields = [];
     let signers = [];
     let auditLog = [];
@@ -55,59 +109,236 @@
     let drawing = false;
     let canvasCtx = null, canvasEl = null;
     let currentDrawDataUrl = null;
-    let currentDocId = null;
+    let affiliateReferrals = [];
+    let monthlyDocumentCount = 0;
     
-    // NEW: Templates storage
+    // OTP State
+    let pendingOTP = null;
+    let pendingEmail = null;
+    let pendingPassword = null;
+    let pendingAction = null; // 'signup' or 'login'
+    let pendingReferralCode = null;
+    
+    const PRO_MONTHLY_LIMIT = 200;
+    const FREE_TIER_LIMIT = 3;
+    
     let templates = [
       { id: 't1', name: 'NDA Agreement', fields: [{ leftPercent: 35, topPercent: 55 }, { leftPercent: 65, topPercent: 55 }], signerCount: 2 },
       { id: 't2', name: 'Sales Contract', fields: [{ leftPercent: 40, topPercent: 70 }, { leftPercent: 60, topPercent: 70 }], signerCount: 2 },
       { id: 't3', name: 'Service Agreement', fields: [{ leftPercent: 45, topPercent: 65 }], signerCount: 1 }
     ];
     
-    // NEW: Reminder & Expiration settings for current document
     let reminderSettings = { enabled: false, daysBefore: 3, expirationDays: 7, reminderSent: false };
     let expirationTimer = null;
+    let bulkQueue = [];
     
-    // NEW: Bulk send queue (simulate multiple recipients)
-    let bulkQueue = []; // { email, name, status }
+    // Store registered users (in-memory for demo)
+    let registeredUsers = [];
     
-    // API readiness flag (mock endpoints)
-    let apiReady = true;
+    // Generate random OTP
+    function generateOTP() {
+      return Math.floor(100000 + Math.random() * 900000).toString();
+    }
     
-    // Helper: update UI & re-render
+    // Simulate sending OTP (in real app, this would send an email)
+    function sendOTP(email, otp) {
+      console.log(`[SIMULATED EMAIL] OTP for ${email}: ${otp}`);
+      addAudit(`📧 Verification code sent to ${email}`, "info");
+      return true;
+    }
+    
     function setActivePage(page, pushState = true) {
       activePage = page;
       renderApp();
       if (pushState) window.history.pushState({ page }, '', `#${page}`);
     }
 
-    function requireAuth(callback) {
-      if (currentUser) callback();
-      else { setActivePage('login'); alert('Please sign in to access the document workspace.'); }
+    function generateAffiliateCode() {
+      return 'SF-' + Math.random().toString(36).substring(2, 10).toUpperCase();
     }
 
-    function handleSignup(email, password, plan = 'free') {
-      if (!email) return false;
-      currentUser = { email, plan: plan, docsRemaining: (plan === 'free' ? 3 : Infinity), documentsSigned: 0 };
-      signatureFields = [];
-      signers = [{ id: "s1", name: currentUser.email.split('@')[0], email: currentUser.email }];
-      auditLog = [];
-      reminderSettings = { enabled: false, daysBefore: 3, expirationDays: 7, reminderSent: false };
-      addAudit(`Welcome ${currentUser.email}! Free tier: ${currentUser.docsRemaining === Infinity ? 'Unlimited' : currentUser.docsRemaining} documents remaining.`);
-      setActivePage('dashboard');
-      return true;
+    function getAffiliateTier(referralCount) {
+      if (referralCount >= 50) return { name: 'Platinum', commission: 30, color: 'tier-platinum' };
+      if (referralCount >= 15) return { name: 'Gold', commission: 25, color: 'tier-gold' };
+      if (referralCount >= 5) return { name: 'Silver', commission: 22, color: 'tier-silver' };
+      return { name: 'Bronze', commission: 20, color: 'tier-bronze' };
     }
 
-    function handleLogin(email) {
-      if (!email) return false;
-      currentUser = { email, plan: 'free', docsRemaining: 3, documentsSigned: 0 };
-      signers = [{ id: "s1", name: email.split('@')[0], email }];
-      signatureFields = [];
-      auditLog = [];
-      reminderSettings = { enabled: false, daysBefore: 3, expirationDays: 7, reminderSent: false };
-      addAudit(`Logged in as ${email}. Free tier: 3 free docs. Upgrade for unlimited.`);
-      setActivePage('dashboard');
+    const revenueProjection = {
+      year1: { newReferrals: 20, totalReferrals: 20, earnings: 661, avgMonthly: 55, endMonthly: 116 },
+      year2: { newReferrals: 31, totalReferrals: 51, earnings: 3204, avgMonthly: 267, endMonthly: 420 },
+      year3: { newReferrals: 43, totalReferrals: 94, earnings: 9060, avgMonthly: 755, endMonthly: 1060 },
+      total: { referrals: 94, earnings: 12925 }
+    };
+
+    // OTP-based signup flow
+    function initiateSignup(email, password, referralCode) {
+      if (!email || !password) {
+        alert("Email and password are required");
+        return false;
+      }
+      if (password.length < 6) {
+        alert("Password must be at least 6 characters");
+        return false;
+      }
+      // Check if email already registered
+      if (registeredUsers.some(u => u.email === email)) {
+        alert("Email already registered. Please login instead.");
+        return false;
+      }
+      
+      pendingEmail = email;
+      pendingPassword = password;
+      pendingReferralCode = referralCode;
+      pendingAction = 'signup';
+      
+      const otp = generateOTP();
+      pendingOTP = otp;
+      sendOTP(email, otp);
+      
+      document.getElementById('otpEmailDisplay').innerText = email;
+      document.getElementById('otpCode').value = '';
+      document.getElementById('otpModal').classList.remove('hidden');
+      
       return true;
+    }
+    
+    // OTP-based login flow
+    function initiateLogin(email, password) {
+      if (!email || !password) {
+        alert("Email and password are required");
+        return false;
+      }
+      
+      // Check if user exists
+      const userExists = registeredUsers.some(u => u.email === email);
+      if (!userExists) {
+        alert("No account found with this email. Please sign up first.");
+        return false;
+      }
+      
+      pendingEmail = email;
+      pendingPassword = password;
+      pendingAction = 'login';
+      
+      const otp = generateOTP();
+      pendingOTP = otp;
+      sendOTP(email, otp);
+      
+      document.getElementById('otpEmailDisplay').innerText = email;
+      document.getElementById('otpCode').value = '';
+      document.getElementById('otpModal').classList.remove('hidden');
+      
+      return true;
+    }
+    
+    // Verify OTP and complete action
+    function verifyOTP(enteredCode) {
+      if (enteredCode !== pendingOTP) {
+        alert("Invalid verification code. Please try again.");
+        return false;
+      }
+      
+      if (pendingAction === 'signup') {
+        // Complete signup
+        const affiliateCode = generateAffiliateCode();
+        currentUser = { 
+          email: pendingEmail, 
+          plan: 'free', 
+          docsRemaining: FREE_TIER_LIMIT, 
+          documentsSigned: 0,
+          monthlyDocCount: 0,
+          affiliateCode: affiliateCode,
+          referralEarnings: 0,
+          referralCount: 0,
+          paidReferrals: 0,
+          planType: 'free'
+        };
+        
+        // Store user
+        registeredUsers.push({
+          email: pendingEmail,
+          password: pendingPassword,
+          affiliateCode: affiliateCode
+        });
+        
+        signatureFields = [];
+        signers = [{ id: "s1", name: currentUser.email.split('@')[0], email: currentUser.email }];
+        auditLog = [];
+        monthlyDocumentCount = 0;
+        affiliateReferrals = [];
+        
+        if (pendingReferralCode) addAudit(`🎉 Signed up via affiliate link: ${pendingReferralCode}`);
+        addAudit(`Welcome ${currentUser.email}! Your account has been verified.`);
+        
+        document.getElementById('otpModal').classList.add('hidden');
+        clearOTPState();
+        setActivePage('dashboard');
+        
+      } else if (pendingAction === 'login') {
+        // Complete login - find user
+        const foundUser = registeredUsers.find(u => u.email === pendingEmail);
+        if (foundUser && foundUser.password === pendingPassword) {
+          currentUser = { 
+            email: pendingEmail, 
+            plan: 'free', 
+            docsRemaining: FREE_TIER_LIMIT, 
+            documentsSigned: 0, 
+            monthlyDocCount: 0,
+            affiliateCode: foundUser.affiliateCode || generateAffiliateCode(),
+            referralEarnings: 0,
+            referralCount: 0,
+            paidReferrals: 0,
+            planType: 'free'
+          };
+          signers = [{ id: "s1", name: currentUser.email.split('@')[0], email: currentUser.email }];
+          signatureFields = [];
+          auditLog = [];
+          monthlyDocumentCount = 0;
+          affiliateReferrals = [];
+          addAudit(`Logged in as ${pendingEmail} with OTP verification.`);
+          
+          document.getElementById('otpModal').classList.add('hidden');
+          clearOTPState();
+          setActivePage('dashboard');
+        } else {
+          alert("Invalid credentials. Please try again.");
+          return false;
+        }
+      }
+      return true;
+    }
+    
+    function resendOTP() {
+      if (pendingEmail) {
+        const newOTP = generateOTP();
+        pendingOTP = newOTP;
+        sendOTP(pendingEmail, newOTP);
+        alert(`New verification code sent to ${pendingEmail}`);
+      }
+    }
+    
+    function clearOTPState() {
+      pendingOTP = null;
+      pendingEmail = null;
+      pendingPassword = null;
+      pendingAction = null;
+      pendingReferralCode = null;
+    }
+
+    function loadSampleAffiliateData() {
+      if (currentUser) {
+        currentUser.referralCount = 3;
+        currentUser.paidReferrals = 2;
+        currentUser.referralEarnings = 11.60;
+        affiliateReferrals = [
+          { email: "john@example.com", status: "active", plan: "Pro", date: "2026-03-15", earnings: 5.80 },
+          { email: "jane@example.com", status: "active", plan: "Pro", date: "2026-03-20", earnings: 5.80 },
+          { email: "bob@example.com", status: "pending", plan: null, date: "2026-04-01", earnings: 0 }
+        ];
+        addAudit("Sample affiliate data loaded.");
+        renderDashboardContent();
+      }
     }
 
     function handleLogout() {
@@ -123,9 +354,21 @@
     function upgradeToUnlimited() {
       if (!currentUser) return;
       currentUser.plan = 'unlimited';
+      currentUser.planType = 'unlimited';
+      currentUser.docsRemaining = PRO_MONTHLY_LIMIT;
+      currentUser.monthlyDocCount = 0;
+      addAudit(`✨ UPGRADED to Pro Plan ($29/mo): ${PRO_MONTHLY_LIMIT} documents per month.`);
+      alert(`Thank you! You are now on the Pro Plan.`);
+      renderApp();
+    }
+
+    function upgradeToEnterprise() {
+      if (!currentUser) return;
+      currentUser.plan = 'enterprise';
+      currentUser.planType = 'enterprise';
       currentUser.docsRemaining = Infinity;
-      addAudit(`✨ UPGRADED to Unlimited plan: flat monthly rate, unlimited document signatures.`);
-      alert('Thank you! You are now on the Unlimited plan. Flat monthly rate, unlimited signing.');
+      addAudit(`🏢 UPGRADED to Enterprise plan ($499/mo): Unlimited documents.`);
+      alert('Enterprise plan activated!');
       renderApp();
     }
 
@@ -138,7 +381,26 @@
     function genId() { return Date.now() + '-' + Math.random().toString(36).substr(2, 6); }
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
 
-    // NEW: Template functions
+    function checkFairUseLimit() {
+      if (!currentUser) return true;
+      if (currentUser.planType === 'enterprise') return true;
+      if (currentUser.planType === 'unlimited') {
+        if (currentUser.monthlyDocCount >= PRO_MONTHLY_LIMIT) {
+          addAudit(`⚠️ PRO PLAN LIMIT REACHED: ${PRO_MONTHLY_LIMIT} documents this month.`, "warn");
+          alert(`You have reached your Pro Plan limit of ${PRO_MONTHLY_LIMIT} documents this month.`);
+          return false;
+        }
+      }
+      if (currentUser.planType === 'free') {
+        if (currentUser.docsRemaining <= 0) {
+          addAudit(`⚠️ Free tier limit reached (${FREE_TIER_LIMIT} documents).`, "warn");
+          alert(`You have used your ${FREE_TIER_LIMIT} free documents. Upgrade to Pro.`);
+          return false;
+        }
+      }
+      return true;
+    }
+
     function loadTemplate(templateId) {
       const template = templates.find(t => t.id === templateId);
       if (!template) return;
@@ -150,54 +412,26 @@
         signedData: null,
         status: 'pending'
       }));
-      addAudit(`📋 Loaded template: ${template.name} with ${signatureFields.length} signature fields.`);
+      addAudit(`📋 Loaded template: ${template.name}`);
       renderDashboardContent();
     }
     
-    // NEW: Reminder & Expiration logic
-    function setRemindersAndExpiration(enabled, daysBefore, expirationDays) {
-      reminderSettings = { enabled, daysBefore, expirationDays, reminderSent: false };
-      if (expirationTimer) clearTimeout(expirationTimer);
-      if (enabled && expirationDays > 0) {
-        expirationTimer = setTimeout(() => {
-          if (signatureFields.some(f => !f.signedData)) {
-            addAudit(`⏰ DOCUMENT EXPIRED: ${expirationDays} days passed without full signing.`, "warn");
-            alert(`Document has expired after ${expirationDays} days. Please create a new document.`);
-          }
-        }, expirationDays * 24 * 60 * 60 * 1000);
-        addAudit(`⏲️ Expiration set: ${expirationDays} days. Reminders: ${enabled ? `every ${daysBefore} days before expiry` : 'off'}`);
-      }
-      // Simulate reminder check
-      if (enabled && daysBefore > 0) {
-        const reminderInterval = setInterval(() => {
-          if (!currentUser) { clearInterval(reminderInterval); return; }
-          if (!reminderSettings.reminderSent && signatureFields.some(f => !f.signedData)) {
-            addAudit(`📧 REMINDER: ${daysBefore}-day reminder sent to pending signers.`, "info");
-            reminderSettings.reminderSent = true;
-          }
-        }, 10000); // Simulate reminder every 10 seconds for demo (in real: based on days)
-        setTimeout(() => clearInterval(reminderInterval), 60000);
-      }
-      renderDashboardContent();
-    }
-    
-    // NEW: Bulk send function
     function openBulkSendModal() {
-      const emails = prompt("Enter comma-separated email addresses for bulk send:\ne.g., signer1@example.com, signer2@example.com");
+      if (currentUser?.planType === 'free') {
+        alert("Bulk send is available on Pro and Enterprise plans only.");
+        return;
+      }
+      const emails = prompt("Enter comma-separated email addresses for bulk send:");
       if (!emails) return;
       const emailList = emails.split(',').map(e => e.trim()).filter(e => e);
       bulkQueue = emailList.map(email => ({ email, name: email.split('@')[0], status: 'pending' }));
       addAudit(`📨 BULK SEND: Initiated to ${bulkQueue.length} recipients.`);
-      alert(`Bulk send initiated to ${bulkQueue.length} recipients. Each will receive a signing request.`);
-      // Simulate sending to first recipient
       if (bulkQueue.length > 0) {
         signers = bulkQueue.map((r, idx) => ({ id: genId(), name: r.name, email: r.email }));
-        addAudit(`✅ Bulk recipients added as signers.`);
         renderDashboardContent();
       }
     }
 
-    // Document signing core logic
     function addSignatureFieldAt(xPercent, yPercent) {
       if (!addFieldMode) return false;
       if (!signers.length) return false;
@@ -205,7 +439,7 @@
       if (!defaultSigner) return false;
       const newField = { id: genId(), signerId: defaultSigner, leftPercent: Math.min(90, Math.max(5, xPercent)), topPercent: Math.min(90, Math.max(5, yPercent)), signedData: null, status: 'pending' };
       signatureFields.push(newField);
-      addAudit(`➕ Added signature field for ${signers.find(s=>s.id===defaultSigner)?.name}`);
+      addAudit(`➕ Added signature field`);
       renderDashboardContent();
       return true;
     }
@@ -254,7 +488,7 @@
       const typedValue = document.getElementById('typedSignatureInput').value.trim();
       if (!typedValue) return alert("Enter signature");
       field.signedData = { type: 'typed', html: typedValue };
-      addAudit(`✍️ Signed by ${signers.find(s=>s.id===field.signerId)?.name}`);
+      addAudit(`✍️ Signed`);
       closeModal();
       renderDashboardContent();
       checkDocumentCompletion();
@@ -265,7 +499,7 @@
       const field = signatureFields.find(f => f.id === currentFieldIdForModal);
       if (!field || !currentDrawDataUrl) return alert("Draw signature first");
       field.signedData = { type: 'draw', imgData: currentDrawDataUrl };
-      addAudit(`🖌️ Drew signature by ${signers.find(s=>s.id===field.signerId)?.name}`);
+      addAudit(`🖌️ Drew signature`);
       closeModal();
       renderDashboardContent();
       checkDocumentCompletion();
@@ -275,19 +509,18 @@
       if (!currentUser) return;
       const allSigned = signatureFields.length > 0 && signatureFields.every(f => f.signedData);
       if (allSigned && signatureFields.length) {
-        if (currentUser.plan === 'free' && currentUser.docsRemaining > 0 && currentUser.docsRemaining !== Infinity) {
-          currentUser.docsRemaining -= 1;
-          currentUser.documentsSigned = (currentUser.documentsSigned || 0) + 1;
-          addAudit(`📄 Document fully signed! Free tier: ${currentUser.docsRemaining} document(s) left.`);
-          if (currentUser.docsRemaining === 0) alert("You've used all 3 free documents! Please upgrade to unlimited plan for continued signing.");
-          else alert("Document completed! Audit trail saved.");
+        if (!checkFairUseLimit()) return;
+        if (currentUser.plan === 'free') {
+          currentUser.docsRemaining--;
+          addAudit(`📄 Document signed! Free tier: ${currentUser.docsRemaining} of ${FREE_TIER_LIMIT} remaining.`);
+          if (currentUser.docsRemaining === 0) alert(`You've used all ${FREE_TIER_LIMIT} free documents! Upgrade to Pro.`);
         } else if (currentUser.plan === 'unlimited') {
-          addAudit(`📄 Document fully signed (Unlimited plan).`);
-          alert("Document fully executed! Unlimited plan active.");
-        } else if (currentUser.plan === 'free' && currentUser.docsRemaining <= 0) {
-          addAudit(`⚠️ No free documents left. Please upgrade to continue.`, "warn");
-          alert("You have used your 3 free documents. Upgrade to unlimited plan to keep signing.");
-        } else { addAudit(`Document signed.`); alert("Document complete."); }
+          currentUser.monthlyDocCount++;
+          currentUser.docsRemaining = PRO_MONTHLY_LIMIT - currentUser.monthlyDocCount;
+          addAudit(`📄 Document signed. Monthly usage: ${currentUser.monthlyDocCount}/${PRO_MONTHLY_LIMIT}.`);
+        } else if (currentUser.plan === 'enterprise') {
+          addAudit(`📄 Document signed (Enterprise Plan).`);
+        }
       }
     }
 
@@ -308,7 +541,7 @@
       document.getElementById('clearCanvasBtn')?.addEventListener('click', () => { canvasCtx.clearRect(0, 0, canvasEl.width, canvasEl.height); canvasCtx.fillStyle = "white"; canvasCtx.fillRect(0, 0, canvasEl.width, canvasEl.height); currentDrawDataUrl = null; });
     }
 
-    // ---------- RENDER FUNCTIONS ----------
+    // RENDER FUNCTIONS
     function renderApp() {
       const root = document.getElementById('appRoot');
       if (!root) return;
@@ -329,61 +562,136 @@
       attachGlobalEvents();
       if (activePage === 'dashboard') { initDashboardEvents(); initCanvasDrawing(); }
       if (activePage === 'dashboard' && addFieldMode) document.getElementById('addModeBadge')?.classList.remove('hidden');
+      
       const modal = document.getElementById('signatureModal');
       if (modal && !modal.hasListener) { modal.hasListener = true; document.getElementById('closeModalBtn')?.addEventListener('click', closeModal); document.getElementById('applyTypedBtn')?.addEventListener('click', signFieldWithTyped); document.getElementById('applyDrawBtn')?.addEventListener('click', signFieldWithDraw); document.getElementById('typedTabBtn')?.addEventListener('click', () => { document.getElementById('typedPanel').classList.remove('hidden'); document.getElementById('drawPanel').classList.add('hidden'); }); document.getElementById('drawTabBtn')?.addEventListener('click', () => { document.getElementById('typedPanel').classList.add('hidden'); document.getElementById('drawPanel').classList.remove('hidden'); if(canvasCtx && canvasEl) canvasCtx.fillRect(0,0,canvasEl.width,canvasEl.height); }); }
+      
+      const affiliateModal = document.getElementById('affiliateModal');
+      if (affiliateModal && !affiliateModal.hasListener) {
+        affiliateModal.hasListener = true;
+        document.getElementById('closeAffiliateModalBtn')?.addEventListener('click', () => affiliateModal.classList.add('hidden'));
+        document.getElementById('closeAffiliateModalFooterBtn')?.addEventListener('click', () => affiliateModal.classList.add('hidden'));
+        affiliateModal.addEventListener('click', (e) => { if (e.target === affiliateModal) affiliateModal.classList.add('hidden'); });
+      }
+      
+      // OTP Modal listeners
+      const otpModal = document.getElementById('otpModal');
+      if (otpModal && !otpModal.hasListener) {
+        otpModal.hasListener = true;
+        document.getElementById('verifyOtpBtn')?.addEventListener('click', () => {
+          const code = document.getElementById('otpCode').value;
+          verifyOTP(code);
+        });
+        document.getElementById('resendOtpBtn')?.addEventListener('click', resendOTP);
+      }
     }
 
     function renderHeader() {
-      return `<header class="bg-white/80 backdrop-blur-md border-b sticky top-0 z-30"><div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3"><div class="flex items-center gap-2 cursor-pointer" onclick="window.dispatchEvent(new CustomEvent('navigate', {detail:'home'}))"><div class="bg-gradient-to-r from-blue-600 to-indigo-700 w-9 h-9 rounded-xl flex items-center justify-center shadow"><i class="fas fa-file-signature text-white text-lg"></i></div><span class="font-bold text-xl tracking-tight">SignFlow</span></div><div class="flex items-center gap-3 flex-wrap"><button data-nav="home" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Home</button><button data-nav="pricing" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Pricing</button><button data-nav="templates" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Templates</button><button data-nav="about" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">About</button>${currentUser ? `<span class="text-sm bg-blue-50 px-3 py-1 rounded-full"><i class="fas fa-user"></i> ${currentUser.email.split('@')[0]} | ${currentUser.plan === 'unlimited' ? '♾️ Unlimited' : `📄 ${currentUser.docsRemaining} left`}</span><button id="logoutBtn" class="text-sm bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300"><i class="fas fa-sign-out-alt"></i> Logout</button><button data-nav="dashboard" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm shadow">📄 Dashboard</button>` : `<button data-nav="login" class="text-gray-700 text-sm font-medium">Sign In</button><button data-nav="signup" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm shadow">Start Free</button>`}</div></div></header>`;
+      return `<header class="bg-white/80 backdrop-blur-md border-b sticky top-0 z-30"><div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3"><div class="flex items-center gap-2 cursor-pointer" onclick="window.dispatchEvent(new CustomEvent('navigate', {detail:'home'}))"><div class="bg-gradient-to-r from-blue-600 to-indigo-700 w-9 h-9 rounded-xl flex items-center justify-center shadow"><i class="fas fa-file-signature text-white text-lg"></i></div><span class="font-bold text-xl tracking-tight">SignFlow</span><span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Secure OTP</span></div><div class="flex items-center gap-3 flex-wrap"><button data-nav="home" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Home</button><button data-nav="pricing" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Pricing</button><button data-nav="templates" class="nav-link text-gray-600 hover:text-blue-600 text-sm font-medium">Templates</button>${currentUser ? `<span class="text-sm bg-blue-50 px-3 py-1 rounded-full"><i class="fas fa-user"></i> ${currentUser.email.split('@')[0]}</span><button id="logoutBtn" class="text-sm bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300"><i class="fas fa-sign-out-alt"></i> Logout</button><button data-nav="dashboard" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm shadow">📄 Dashboard</button>` : `<button data-nav="login" class="text-gray-700 text-sm font-medium">Sign In</button><button data-nav="signup" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm shadow">Start Free</button>`}</div></div></header>`;
     }
 
-    function renderFooter() { return `<footer class="bg-white border-t mt-12"><div class="max-w-7xl mx-auto px-4 py-6 text-xs text-gray-500 flex flex-wrap justify-between"><div>© 2026 SignFlow Inc. eSignature & Audit Trail | <i class="fas fa-code"></i> API Ready</div><div class="flex gap-4"><button data-nav="about" class="hover:text-blue-600">About</button><button data-nav="privacy" class="hover:text-blue-600">Privacy</button><button data-nav="terms" class="hover:text-blue-600">Terms</button></div></div></footer>`; }
+    function renderFooter() { 
+      return `<footer class="bg-white border-t mt-12"><div class="max-w-7xl mx-auto px-4 py-6 text-xs text-gray-500 flex flex-wrap justify-between"><div>© 2026 SignFlow Inc. | Secure OTP Verification | Earn 20-30% recurring affiliate commissions</div><div class="flex gap-4"><button data-nav="about" class="hover:text-blue-600">About</button><button data-nav="privacy" class="hover:text-blue-600">Privacy</button><button data-nav="terms" class="hover:text-blue-600">Terms</button></div></div></footer>`;
+    }
 
-    function renderHomePage() { return `<div class="max-w-6xl mx-auto px-4 py-12"><div class="text-center"><h1 class="text-5xl font-extrabold bg-gradient-to-r from-blue-800 to-indigo-600 bg-clip-text text-transparent">Sign Smarter, Faster, Legally</h1><p class="text-gray-600 text-lg mt-4 max-w-2xl mx-auto">Audit-ready eSignatures with multi-signer workflows, real-time trails, and free tier.</p><div class="mt-8 flex gap-4 justify-center"><button data-nav="signup" class="btn-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg">Get Started Free → 3 free documents</button><button data-nav="pricing" class="border border-gray-300 px-6 py-3 rounded-xl font-medium">View Unlimited Plans</button></div><div class="mt-16 grid md:grid-cols-4 gap-6 text-left"><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-check-circle text-green-500 text-2xl"></i><h3 class="font-bold mt-3">3 Documents Free</h3><p>No credit card required.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-infinity text-blue-600 text-2xl"></i><h3 class="font-bold mt-3">Unlimited Monthly</h3><p>Flat rate, unlimited docs.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-gavel text-amber-600 text-2xl"></i><h3 class="font-bold mt-3">Legal Audit Trail</h3><p>Court-admissible logs.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-layer-group text-purple-600 text-2xl"></i><h3 class="font-bold mt-3">Templates + Bulk</h3><p>Save time with reusable docs.</p></div></div></div></div>`; }
+    function renderHomePage() { 
+      return `<div class="max-w-6xl mx-auto px-4 py-12"><div class="text-center"><h1 class="text-5xl font-extrabold bg-gradient-to-r from-blue-800 to-indigo-600 bg-clip-text text-transparent">Sign. Send. Secure.</h1><p class="text-gray-600 text-lg mt-4 max-w-2xl mx-auto">Join SignFlow with OTP verification for maximum security. Earn 20-30% recurring affiliate commissions.</p><div class="mt-8 flex gap-4 justify-center"><button data-nav="signup" class="btn-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg">Get Started →</button><button data-nav="login" class="border border-gray-300 px-6 py-3 rounded-xl font-medium">Sign In</button></div><div class="mt-16 grid md:grid-cols-3 gap-6"><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-shield-alt text-green-500 text-2xl"></i><h3 class="font-bold mt-3">OTP Verification</h3><p>Two-factor authentication for every login and signup.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-chart-line text-blue-500 text-2xl"></i><h3 class="font-bold mt-3">200 Docs/Month</h3><p>Only $29/month. 24x more value than DocuSign.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-hand-holding-usd text-purple-500 text-2xl"></i><h3 class="font-bold mt-3">Affiliate Program</h3><p>Earn 20-30% recurring commissions.</p></div></div></div></div>`;
+    }
 
-    function renderPricingPage() { return `<div class="max-w-6xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold text-center">Simple, Transparent Pricing</h2><div class="grid md:grid-cols-2 gap-8 mt-10 max-w-3xl mx-auto"><div class="bg-white rounded-2xl shadow-md p-6 text-center pricing-card"><i class="fas fa-gift text-4xl text-blue-500"></i><h3 class="text-2xl font-bold mt-2">Free Starter</h3><p class="text-gray-500">$0 / forever</p><ul class="mt-4 space-y-2 text-sm"><li>✓ 3 free documents to sign</li><li>✓ Audit trail included</li><li>✓ Templates + Bulk Send</li><li>✓ Reminders & Expiration</li></ul><button data-nav="signup" class="mt-6 w-full bg-blue-50 text-blue-700 py-2 rounded-xl font-semibold">Start Free</button></div><div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-md p-6 text-center pricing-card border-2 border-indigo-200"><i class="fas fa-rocket text-4xl text-indigo-600"></i><h3 class="text-2xl font-bold mt-2">Unlimited Pro</h3><p class="text-gray-500">$29 / month <span class="text-xs">flat rate</span></p><ul class="mt-4 space-y-2 text-sm"><li>✓ Unlimited documents & signatures</li><li>✓ Advanced Templates + API</li><li>✓ Bulk Send + Automation</li><li>✓ Priority support</li></ul><button id="upgradeUnlimitedBtn" class="mt-6 w-full btn-primary text-white py-2 rounded-xl font-semibold shadow">Upgrade to Unlimited</button></div></div><div class="mt-10 text-center text-sm text-gray-500">All plans include ESIGN-compliant signatures & encrypted audit logs.</div></div>`; }
+    function renderPricingPage() { 
+      return `<div class="max-w-6xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold text-center">Simple, Transparent Pricing</h2><div class="grid md:grid-cols-3 gap-6 mt-10 max-w-5xl mx-auto"><div class="bg-white rounded-2xl shadow-md p-6 text-center pricing-card"><i class="fas fa-gift text-4xl text-blue-500"></i><h3 class="text-2xl font-bold mt-2">Free</h3><p class="text-gray-500">$0</p><ul class="mt-4 space-y-2 text-sm"><li>✓ ${FREE_TIER_LIMIT} total documents</li><li>✓ Basic audit trail</li><li>✓ OTP Secure Login</li></ul><button data-nav="signup" class="mt-6 w-full bg-blue-50 text-blue-700 py-2 rounded-xl">Start Free</button></div><div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-md p-6 text-center pricing-card border-2 border-indigo-200"><i class="fas fa-rocket text-4xl text-indigo-600"></i><h3 class="text-2xl font-bold mt-2">Pro</h3><p class="text-gray-500">$29 / month</p><ul class="mt-4 space-y-2 text-sm"><li>✓ ${PRO_MONTHLY_LIMIT} docs/month</li><li>✓ Templates + Bulk Send</li><li>✓ API Access + OTP</li></ul><button id="upgradeUnlimitedPricingBtn" class="mt-6 w-full btn-primary text-white py-2 rounded-xl">Choose Pro</button></div><div class="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-2xl shadow-xl p-6 text-center pricing-card text-white"><i class="fas fa-building text-4xl text-purple-300"></i><h3 class="text-2xl font-bold mt-2">Enterprise</h3><p class="text-purple-200">$499 / month</p><ul class="mt-4 space-y-2 text-sm text-purple-100"><li>✓ Unlimited documents</li><li>✓ SLA + SSO</li><li>✓ White-labeling + OTP</li></ul><button id="upgradeEnterprisePricingBtn" class="mt-6 w-full bg-white text-purple-900 py-2 rounded-xl">Contact Sales</button></div></div></div>`;
+    }
 
-    function renderAboutPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">About SignFlow</h2><p class="mt-4 text-gray-700">We believe signing documents should be seamless, secure, and accessible. Our platform provides enterprise-grade eSignature with a consumer-friendly experience. First 3 documents free, then unlimited flat-rate plan.</p><div class="mt-6 bg-white p-5 rounded-xl"><i class="fas fa-shield-alt text-green-600"></i> <span class="font-semibold">Legal foundation:</span> ESIGN Act, eIDAS compliant. Every signature timestamped and logged.</div><div class="mt-4 bg-gray-50 p-4 rounded-xl"><i class="fas fa-code"></i> <strong>API Ready:</strong> REST endpoints available for integration. Webhooks supported.</div></div>`; }
-    function renderPrivacyPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Privacy Policy</h2><div class="prose mt-4 text-gray-600 space-y-3"><p>We collect email and signature data to facilitate contracts. Data encrypted at rest. We never sell personal data. Audit logs retained for 7 years.</p><p>You may request deletion of your account and associated signatures.</p></div></div>`; }
-    function renderTermsPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Terms & Conditions</h2><div class="prose mt-4 text-gray-600"><p>By using SignFlow, you agree that electronic signatures have legal effect. Free tier limited to 3 documents. Unlimited plan billed monthly. No refunds for partial months.</p><p>We reserve the right to modify pricing with 30-day notice.</p></div></div>`; }
-    function renderLoginPage() { return `<div class="max-w-md mx-auto px-4 py-16"><div class="bg-white rounded-2xl shadow-xl p-8"><h2 class="text-2xl font-bold">Sign in</h2><input type="email" id="loginEmail" placeholder="Email address" class="w-full border rounded-xl p-3 mt-4"><button id="doLoginBtn" class="w-full btn-primary text-white py-3 rounded-xl mt-4 font-semibold">Continue</button><p class="text-center mt-4 text-sm">No account? <button data-nav="signup" class="text-blue-600">Start free trial</button></p></div></div>`; }
-    function renderSignupPage() { return `<div class="max-w-md mx-auto px-4 py-16"><div class="bg-white rounded-2xl shadow-xl p-8"><h2 class="text-2xl font-bold">Create free account</h2><p class="text-gray-500 text-sm">First 3 documents free — then upgrade anytime.</p><input type="email" id="signupEmail" placeholder="Email" class="w-full border rounded-xl p-3 mt-4"><button id="doSignupBtn" class="w-full btn-primary text-white py-3 rounded-xl mt-4 font-semibold">Start signing → 3 free docs</button><p class="text-center text-xs mt-4">By signing up you agree to Terms & Privacy.</p></div></div>`; }
+    function renderAboutPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">About SignFlow</h2><p class="mt-4 text-gray-700">SignFlow combines secure OTP verification with powerful eSignature capabilities. Every login and signup requires email verification for maximum security.</p></div>`; }
+    function renderPrivacyPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Privacy Policy</h2><div class="mt-4"><p>We use OTP verification to secure your account. Your data is encrypted.</p></div></div>`; }
+    function renderTermsPage() { return `<div class="max-w-3xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Terms & Conditions</h2><div class="mt-4"><p>By using SignFlow, you agree to our OTP verification process and terms.</p></div></div>`; }
+    function renderLoginPage() { 
+      return `<div class="max-w-md mx-auto px-4 py-16"><div class="bg-white rounded-2xl shadow-xl p-8"><h2 class="text-2xl font-bold">Sign In</h2><p class="text-sm text-gray-500 mb-4">Enter your email and password. We'll send a verification code.</p><input type="email" id="loginEmail" placeholder="Email address" class="w-full border rounded-xl p-3 mt-2"><input type="password" id="loginPassword" placeholder="Password" class="w-full border rounded-xl p-3 mt-3"><button id="doLoginBtn" class="w-full btn-primary text-white py-3 rounded-xl mt-6 font-semibold">Send Verification Code</button><p class="text-center mt-4 text-sm">No account? <button data-nav="signup" class="text-blue-600">Create account</button></p></div></div>`;
+    }
+    function renderSignupPage() { 
+      return `<div class="max-w-md mx-auto px-4 py-16"><div class="bg-white rounded-2xl shadow-xl p-8"><h2 class="text-2xl font-bold">Create Account</h2><p class="text-sm text-gray-500 mb-4">We'll send a verification code to your email.</p><input type="email" id="signupEmail" placeholder="Email" class="w-full border rounded-xl p-3 mt-2"><input type="password" id="signupPassword" placeholder="Password (min 6 characters)" class="w-full border rounded-xl p-3 mt-3"><input type="text" id="referralCode" placeholder="Referral code (optional)" class="w-full border rounded-xl p-3 mt-3"><button id="doSignupBtn" class="w-full btn-primary text-white py-3 rounded-xl mt-6 font-semibold">Send Verification Code</button><p class="text-center mt-4 text-sm">Already have an account? <button data-nav="login" class="text-blue-600">Sign in</button></p></div></div>`;
+    }
     
     function renderTemplatesPage() {
-      return `<div class="max-w-6xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Document Templates</h2><p class="text-gray-600 mt-2">Save time by reusing signature field layouts.</p><div class="grid md:grid-cols-3 gap-6 mt-8">${templates.map(t => `<div class="bg-white rounded-xl shadow-sm p-5 template-card border border-gray-200 cursor-pointer" data-template-id="${t.id}"><i class="fas fa-file-alt text-blue-500 text-2xl"></i><h3 class="font-bold text-lg mt-2">${t.name}</h3><p class="text-xs text-gray-500">${t.fields.length} signature fields, ${t.signerCount} signer(s)</p><button class="use-template-btn mt-3 text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full" data-id="${t.id}">Use this template</button></div>`).join('')}</div><div class="mt-8 bg-blue-50 p-4 rounded-xl"><i class="fas fa-rocket"></i> Pro tip: Load a template, then customize fields on the dashboard.</div></div>`;
+      return `<div class="max-w-6xl mx-auto px-4 py-12"><h2 class="text-3xl font-bold">Document Templates</h2><div class="grid md:grid-cols-3 gap-6 mt-8">${templates.map(t => `<div class="bg-white rounded-xl shadow-sm p-5 template-card border border-gray-200"><i class="fas fa-file-alt text-blue-500 text-2xl"></i><h3 class="font-bold text-lg mt-2">${t.name}</h3><button class="use-template-btn mt-3 text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full" data-id="${t.id}">Use template</button></div>`).join('')}</div></div>`;
     }
 
     function renderDashboard() {
       if (!currentUser) return '<div class="p-10 text-center">Please login</div>';
-      const remainingText = currentUser.plan === 'unlimited' ? 'Unlimited' : (currentUser.docsRemaining === Infinity ? '∞' : currentUser.docsRemaining);
-      return `<div class="max-w-7xl mx-auto px-4 py-6"><div class="flex flex-wrap justify-between items-center mb-4"><div><h2 class="text-2xl font-bold">Document Workspace</h2><p class="text-sm text-gray-500">Plan: ${currentUser.plan === 'unlimited' ? '♾️ Unlimited Monthly' : `🎁 Free (${currentUser.docsRemaining} of 3 docs left)`}</p></div><div class="flex gap-2">${currentUser.plan !== 'unlimited' ? `<button id="upgradeFromDashboard" class="bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full text-sm font-semibold"><i class="fas fa-bolt"></i> Upgrade to Unlimited ($29/mo)</button>` : ''}<button id="bulkSendBtn" class="bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-envelope-open-text"></i> Bulk Send</button></div></div><div class="grid lg:grid-cols-12 gap-6"><div class="lg:col-span-3 bg-white rounded-2xl p-4 shadow-sm"><h3 class="font-bold flex gap-2"><i class="fas fa-users"></i> Signers</h3><div id="signersList" class="mt-2 space-y-2 max-h-48 overflow-y-auto"></div><button id="addSignerBtn" class="text-xs bg-gray-100 w-full mt-2 py-1 rounded-lg">+ Add Signer</button><div class="mt-4"><h3 class="font-bold text-sm">Reminders & Expiry</h3><div class="mt-2 text-xs"><label class="flex items-center gap-2"><input type="checkbox" id="reminderEnableCheckbox"> Enable reminders</label><div class="mt-1"><span>Remind before (days):</span><input type="number" id="reminderDays" value="3" class="border rounded w-16 text-center mx-1" min="1" max="10"></div><div><span>Expire after (days):</span><input type="number" id="expirationDays" value="7" class="border rounded w-16 text-center mx-1" min="1" max="30"></div><button id="applyReminderBtn" class="mt-2 bg-gray-200 px-2 py-1 rounded text-xs">Apply Settings</button></div></div><div class="mt-4"><h3 class="font-bold text-sm">Audit Trail</h3><div id="auditLogList" class="text-xs space-y-1 max-h-52 overflow-y-auto mt-1 bg-gray-50 p-2 rounded"></div></div></div><div class="lg:col-span-6"><div class="bg-white rounded-2xl shadow-lg border"><div class="bg-gray-50 px-4 py-2 border-b flex justify-between"><span class="font-medium"><i class="fas fa-file"></i> Agreement.pdf</span><button id="toggleAddModeBtn" class="text-xs bg-blue-100 px-3 py-1 rounded-full"><i class="fas fa-plus"></i> Add Field</button></div><div id="documentPreview" class="relative min-h-[480px] p-6 bg-white" style="background-image: radial-gradient(#e5e7eb 0.5px, transparent 0.5px); background-size: 18px 18px;"><div class="prose max-w-none text-sm pointer-events-none"><h2 class="font-bold">Service Contract</h2><p>This agreement between SignFlow and Client. By signing, you agree to terms.</p><div class="border-l-4 border-blue-200 pl-3 italic">Electronic signature valid.</div><p>Terms and conditions attached.</p></div><div id="dynamicFieldsContainer" class="absolute inset-0 p-6 pointer-events-none"></div></div><div class="bg-gray-50 px-4 py-2 text-xs flex justify-between"><span id="modeHint">Click 'Add Field' then click on document to place signature tag.</span><button id="resetDocumentBtn" class="text-red-500"><i class="far fa-trash-alt"></i> Clear fields</button></div></div></div><div class="lg:col-span-3 bg-white p-4 rounded-2xl shadow-sm"><h3 class="font-bold">Signature Fields</h3><div id="fieldsListPanel" class="space-y-2 mt-2 max-h-96 overflow-y-auto"></div><button id="sendDocBtn" class="w-full mt-4 btn-primary text-white py-2 rounded-xl font-semibold"><i class="fas fa-paper-plane"></i> Finalize & Send</button><div class="mt-3 text-center text-[10px] text-gray-400"><i class="fas fa-code"></i> API Ready — Webhooks supported</div></div></div></div>`;
+      const tier = getAffiliateTier(currentUser.referralCount);
+      const expectedPayout = (currentUser.paidReferrals || 0) * 5.80;
+      return `<div class="max-w-7xl mx-auto px-4 py-6"><div class="flex flex-wrap justify-between items-center mb-4"><div><h2 class="text-2xl font-bold">Affiliate Dashboard</h2><p class="text-sm text-gray-500">Welcome, ${currentUser.email} | Your code: <strong class="bg-gray-100 px-2 py-0.5 rounded">${currentUser.affiliateCode}</strong></p></div><div class="flex gap-2"><button id="copyAffiliateLinkBtn" class="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-link"></i> Copy Referral Link</button><button id="sampleDataBtn" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-chart-line"></i> Load Sample</button></div></div><div class="grid lg:grid-cols-12 gap-6"><div class="lg:col-span-5"><div class="referral-stats-card rounded-2xl p-6 shadow-sm"><h3 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-gift text-purple-600"></i> Referrals & Rewards</h3><button id="viewProgramDetailsBtn" class="text-blue-600 text-sm underline mb-4 inline-block">View program details →</button><div class="grid grid-cols-2 gap-4 mt-2"><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-gray-800">${currentUser.referralCount}</div><div class="text-xs text-gray-500">Total referrals</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-green-600">${currentUser.paidReferrals || 0}</div><div class="text-xs text-gray-500">Active (paid accounts)</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-blue-600">$${expectedPayout.toFixed(2)}</div><div class="text-xs text-gray-500">Expected payout</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-gray-800">$${currentUser.referralEarnings.toFixed(2)}</div><div class="text-xs text-gray-500">Paid out</div></div></div><div class="mt-4 flex items-center justify-between bg-white rounded-xl p-3"><span class="text-sm font-medium">Tier:</span><span class="px-3 py-1 rounded-full text-white text-sm ${tier.color}">${tier.name} (${tier.commission}% commission)</span></div><div class="mt-4 text-xs text-gray-500 text-center">Next payout: 15th of next month • Min. $50</div></div></div><div class="lg:col-span-7 bg-white rounded-2xl p-5 shadow-sm"><h3 class="font-bold mb-3"><i class="fas fa-chart-line"></i> 3-Year Earnings Projection</h3><p class="text-xs text-gray-500 mb-3">Based on realistic part-time effort (1-2 hours/week).</p><table class="w-full text-sm projection-table"><thead><tr class="bg-gray-50"><th class="text-left p-2">Year</th><th class="text-left p-2">New Referrals</th><th class="text-left p-2">Total</th><th class="text-left p-2">Earnings</th><th class="text-left p-2">Avg Monthly</th><th class="text-left p-2">End Monthly</th></tr></thead><tbody><tr><td class="p-2 font-medium">Year 1</td><td class="p-2">${revenueProjection.year1.newReferrals}</td><td class="p-2">${revenueProjection.year1.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year1.earnings}</td><td class="p-2">$${revenueProjection.year1.avgMonthly}</td><td class="p-2">$${revenueProjection.year1.endMonthly}</td></tr><tr><td class="p-2 font-medium">Year 2</td><td class="p-2">${revenueProjection.year2.newReferrals}</td><td class="p-2">${revenueProjection.year2.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year2.earnings}</td><td class="p-2">$${revenueProjection.year2.avgMonthly}</td><td class="p-2">$${revenueProjection.year2.endMonthly}</td></tr><tr><td class="p-2 font-medium">Year 3</td><td class="p-2">${revenueProjection.year3.newReferrals}</td><td class="p-2">${revenueProjection.year3.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year3.earnings}</td><td class="p-2">$${revenueProjection.year3.avgMonthly}</td><td class="p-2">$${revenueProjection.year3.endMonthly}</td></tr><tr class="bg-blue-50"><td class="p-2 font-bold">TOTAL</td><td class="p-2">${revenueProjection.total.referrals}</td><td class="p-2"></td><td class="p-2 font-bold text-blue-700">$${revenueProjection.total.earnings}</td><td class="p-2"></td><td class="p-2 font-bold">~$${revenueProjection.year3.endMonthly}/mo</td></tr></tbody></table><div class="mt-3 bg-green-50 p-3 rounded-lg"><p class="text-xs text-green-800"><i class="fas fa-info-circle"></i> <strong>Non-aggressive projection:</strong> Part-time effort (1-2 hours/week). OTP verification ensures account security.</p></div></div></div><div class="mt-6"><div class="bg-white rounded-2xl p-5 shadow-sm"><h3 class="font-bold mb-3"><i class="fas fa-file-signature"></i> Document Workspace</h3><div class="flex gap-2 mb-4"><button id="toggleAddModeBtn" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"><i class="fas fa-plus"></i> Add Signature Field</button><button id="resetDocumentBtn" class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">Clear Fields</button><button id="sendDocBtn" class="btn-primary text-white px-4 py-1 rounded-full text-sm">Finalize Document</button></div><div id="documentPreview" class="relative min-h-[300px] p-6 bg-gray-50 rounded-xl border" style="background-image: radial-gradient(#e5e7eb 0.5px, transparent 0.5px);"><div class="prose max-w-none text-sm pointer-events-none"><p class="text-center text-gray-400">Click "Add Signature Field" then click on this area to place signature tags.</p></div><div id="dynamicFieldsContainer" class="absolute inset-0 p-6 pointer-events-none"></div></div><div id="signersList" class="mt-3 flex flex-wrap gap-2"></div><button id="addSignerBtn" class="mt-2 text-xs bg-gray-100 px-3 py-1 rounded-full">+ Add Signer</button></div></div></div>`;
     }
 
-    function renderDashboardContent() { if (activePage !== 'dashboard') return; const signersContainer = document.getElementById('signersList'); if (signersContainer) signersContainer.innerHTML = signers.map(s => `<div class="flex justify-between bg-gray-100 p-1 rounded text-xs"><span>${escapeHtml(s.name)}</span><button class="remove-signer-dash text-red-400" data-id="${s.id}"><i class="fas fa-times-circle"></i></button></div>`).join(''); document.querySelectorAll('.remove-signer-dash').forEach(btn => btn.addEventListener('click', (e) => { const id = btn.getAttribute('data-id'); if (signatureFields.some(f=>f.signerId===id)) { alert("Remove fields first"); return; } signers = signers.filter(s=>s.id !== id); renderDashboardContent(); })); const auditDiv = document.getElementById('auditLogList'); if(auditDiv) auditDiv.innerHTML = auditLog.slice(0,8).map(l=>`<div class="border-l-2 border-blue-300 pl-1">${l.timestamp}: ${l.message}</div>`).join(''); const fieldsContainer = document.getElementById('dynamicFieldsContainer'); if(fieldsContainer) renderFieldsOnDocument(fieldsContainer); const fieldsPanel = document.getElementById('fieldsListPanel'); if(fieldsPanel) fieldsPanel.innerHTML = signatureFields.map(f=>`<div class="text-xs bg-gray-50 p-2 rounded flex justify-between"><span>${f.signedData ? '✅' : '⏳'} ${signers.find(s=>s.id===f.signerId)?.name}</span><button class="delete-field-panel text-red-500" data-id="${f.id}"><i class="fas fa-trash"></i></button></div>`).join(''); document.querySelectorAll('.delete-field-panel').forEach(btn=>btn.addEventListener('click',(e)=>{const id=btn.getAttribute('data-id');deleteFieldById(id);})); }
+    function renderDashboardContent() {
+      if (activePage !== 'dashboard') return;
+      const fieldsContainer = document.getElementById('dynamicFieldsContainer');
+      if (fieldsContainer) renderFieldsOnDocument(fieldsContainer);
+      const signersContainer = document.getElementById('signersList');
+      if (signersContainer && signers.length) {
+        signersContainer.innerHTML = signers.map(s => `<span class="bg-gray-100 px-2 py-1 rounded-full text-xs">${escapeHtml(s.name)} <button class="remove-signer-dash text-red-400 ml-1" data-id="${s.id}"><i class="fas fa-times"></i></button></span>`).join('');
+        document.querySelectorAll('.remove-signer-dash').forEach(btn => btn.addEventListener('click', (e) => { const id = btn.getAttribute('data-id'); signers = signers.filter(s => s.id !== id); renderDashboardContent(); }));
+      }
+    }
 
     function initDashboardEvents() {
-      const container = document.getElementById('documentPreview'); if(!container) return;
-      const toggleBtn = document.getElementById('toggleAddModeBtn'); if(toggleBtn) toggleBtn.onclick = () => { addFieldMode = !addFieldMode; const badge = document.getElementById('addModeBadge'); if(badge) addFieldMode ? badge.classList.remove('hidden') : badge.classList.add('hidden'); document.getElementById('modeHint').innerHTML = addFieldMode ? '🔵 ADD MODE: click document to place field' : "Click 'Add Field' then click on document."; };
-      const upgradeBtn = document.getElementById('upgradeFromDashboard'); if(upgradeBtn) upgradeBtn.onclick = () => upgradeToUnlimited();
-      const sendBtn = document.getElementById('sendDocBtn'); if(sendBtn) sendBtn.onclick = () => { if(signatureFields.length === 0) alert('Add signature fields first'); else checkDocumentCompletion(); };
-      const resetBtn = document.getElementById('resetDocumentBtn'); if(resetBtn) resetBtn.onclick = () => { signatureFields = []; renderDashboardContent(); addAudit("Reset document fields."); };
-      const bulkBtn = document.getElementById('bulkSendBtn'); if(bulkBtn) bulkBtn.onclick = () => openBulkSendModal();
-      document.getElementById('addSignerBtn')?.addEventListener('click', () => { let name = prompt("Signer full name"); if(name) signers.push({ id: genId(), name, email: name.toLowerCase()+'@example.com' }); renderDashboardContent(); });
-      document.getElementById('applyReminderBtn')?.addEventListener('click', () => { const enabled = document.getElementById('reminderEnableCheckbox')?.checked || false; const days = parseInt(document.getElementById('reminderDays')?.value) || 3; const expiry = parseInt(document.getElementById('expirationDays')?.value) || 7; setRemindersAndExpiration(enabled, days, expiry); });
+      const container = document.getElementById('documentPreview');
+      if (!container) return;
+      const toggleBtn = document.getElementById('toggleAddModeBtn');
+      if (toggleBtn) toggleBtn.onclick = () => { addFieldMode = !addFieldMode; document.getElementById('addModeBadge')?.classList.toggle('hidden'); };
+      const sendBtn = document.getElementById('sendDocBtn');
+      if (sendBtn) sendBtn.onclick = () => { if (signatureFields.length === 0) alert('Add signature fields first'); else checkDocumentCompletion(); };
+      const resetBtn = document.getElementById('resetDocumentBtn');
+      if (resetBtn) resetBtn.onclick = () => { signatureFields = []; renderDashboardContent(); addAudit("Reset document fields."); };
+      const copyBtn = document.getElementById('copyAffiliateLinkBtn');
+      if (copyBtn) copyBtn.onclick = () => { const link = `https://signflow.app/?ref=${currentUser.affiliateCode}`; navigator.clipboard.writeText(link); alert('Referral link copied!'); };
+      const sampleBtn = document.getElementById('sampleDataBtn');
+      if (sampleBtn) sampleBtn.onclick = () => loadSampleAffiliateData();
+      document.getElementById('addSignerBtn')?.addEventListener('click', () => { let name = prompt("Signer name"); if(name) signers.push({ id: genId(), name, email: name.toLowerCase()+'@example.com' }); renderDashboardContent(); });
       container.addEventListener('click', (e) => { if(!addFieldMode) return; const rect = document.getElementById('dynamicFieldsContainer').getBoundingClientRect(); const x = ((e.clientX - rect.left)/rect.width)*100; const y = ((e.clientY - rect.top)/rect.height)*100; if(x>=0 && x<=100 && y>=0 && y<=100) addSignatureFieldAt(x,y); });
       renderDashboardContent();
     }
 
     function attachGlobalEvents() {
       document.querySelectorAll('.nav-link, [data-nav]').forEach(el => { if(!el.hasListener) { el.addEventListener('click', (e) => { const page = el.getAttribute('data-nav'); if(page) setActivePage(page); }); el.hasListener=true; } });
-      document.querySelectorAll('.use-template-btn, [data-template-id]').forEach(el => { if(!el.hasListener) { el.addEventListener('click', (e) => { const tid = el.getAttribute('data-id') || el.getAttribute('data-template-id'); if(tid && currentUser) { loadTemplate(tid); setActivePage('dashboard'); } else if(tid && !currentUser) alert('Please sign in first'); }); el.hasListener=true; } });
+      document.querySelectorAll('.use-template-btn').forEach(el => { if(!el.hasListener) { el.addEventListener('click', (e) => { const tid = el.getAttribute('data-id'); if(tid && currentUser) { loadTemplate(tid); setActivePage('dashboard'); } else if(tid && !currentUser) alert('Please sign in first'); }); el.hasListener=true; } });
+      
+      const viewProgramBtns = ['viewProgramDetailsHomeBtn', 'viewProgramDetailsBtn'];
+      viewProgramBtns.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn && !btn.hasListener) { btn.addEventListener('click', () => document.getElementById('affiliateModal').classList.remove('hidden')); btn.hasListener = true; }
+      });
+      
       const logout = document.getElementById('logoutBtn'); if(logout && !logout.hasListener) { logout.addEventListener('click', handleLogout); logout.hasListener=true; }
-      const loginBtn = document.getElementById('doLoginBtn'); if(loginBtn) loginBtn.onclick = () => { const email = document.getElementById('loginEmail')?.value; if(email) handleLogin(email); else alert("Enter email"); };
-      const signupBtn = document.getElementById('doSignupBtn'); if(signupBtn) signupBtn.onclick = () => { const email = document.getElementById('signupEmail')?.value; if(email) handleSignup(email, 'pass', 'free'); else alert("Email required"); };
-      const upgradePricing = document.getElementById('upgradeUnlimitedBtn'); if(upgradePricing) upgradePricing.onclick = () => { if(currentUser) upgradeToUnlimited(); else alert("Please sign up first"); };
+      
+      const loginBtn = document.getElementById('doLoginBtn');
+      if (loginBtn && !loginBtn.hasListener) {
+        loginBtn.addEventListener('click', () => {
+          const email = document.getElementById('loginEmail')?.value;
+          const password = document.getElementById('loginPassword')?.value;
+          if (email && password) initiateLogin(email, password);
+          else alert("Please enter email and password");
+        });
+        loginBtn.hasListener = true;
+      }
+      
+      const signupBtn = document.getElementById('doSignupBtn');
+      if (signupBtn && !signupBtn.hasListener) {
+        signupBtn.addEventListener('click', () => {
+          const email = document.getElementById('signupEmail')?.value;
+          const password = document.getElementById('signupPassword')?.value;
+          const referralCode = document.getElementById('referralCode')?.value;
+          if (email && password) initiateSignup(email, password, referralCode);
+          else alert("Please enter email and password");
+        });
+        signupBtn.hasListener = true;
+      }
+      
+      const upgradePricing = document.getElementById('upgradeUnlimitedPricingBtn'); if(upgradePricing) upgradePricing.onclick = () => { if(currentUser) upgradeToUnlimited(); else alert("Sign up first"); };
+      const upgradeEnterprise = document.getElementById('upgradeEnterprisePricingBtn'); if(upgradeEnterprise) upgradeEnterprise.onclick = () => { if(currentUser) upgradeToEnterprise(); else alert("Sign up first"); };
     }
 
-    window.addEventListener('popstate', () => { const hash = window.location.hash.slice(1); if(hash) setActivePage(hash, false); else setActivePage('home', false); });
+    window.addEventListener('popstate', () => { const hash = window.location.hash.slice(1); setActivePage(hash || 'home', false); });
     window.addEventListener('navigate', (e) => setActivePage(e.detail));
     renderApp();
   </script>
