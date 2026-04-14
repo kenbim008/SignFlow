@@ -1,9 +1,10 @@
-import 'dotenv/config';
+import './env-bootstrap.js';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { spawnSync } from 'node:child_process';
 import bcrypt from 'bcryptjs';
 import { prisma } from './lib/prisma.js';
 import { generateAffiliateCode } from './lib/affiliate.js';
@@ -19,7 +20,9 @@ const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const dataDir = path.join(root, 'data');
 
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+if (process.env.VERCEL !== '1' && !fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
 
 async function ensureAdminUser() {
   const email = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
@@ -50,39 +53,80 @@ async function ensureAdminUser() {
   console.log('[bootstrap] Admin user created:', email);
 }
 
-async function main() {
-  await prisma.$connect();
-  await ensureAdminUser();
-
-  const app = express();
-  app.use(cors({ origin: true, credentials: true }));
-  app.use(express.json({ limit: '12mb' }));
-
-  app.use('/api/auth', authRoutes);
-  app.use('/api/user', userRoutes);
-  app.use('/api/affiliate', affiliateRoutes);
-  app.use('/api/documents', documentRoutes);
-  app.use('/api/admin', adminRoutes);
-
-  app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'signproz' }));
-
-  if (fs.existsSync(publicDir)) {
-    const sendDemo = (_req, res) => {
-      const demo = path.join(publicDir, 'demo.html');
-      if (fs.existsSync(demo)) return res.sendFile(demo);
-      res.status(404).type('text').send('demo.html missing');
-    };
-    app.get('/demo', sendDemo);
-    app.get('/demo/', sendDemo);
-    app.use(express.static(publicDir));
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api')) return next();
-      const index = path.join(publicDir, 'index.html');
-      if (fs.existsSync(index)) return res.sendFile(index);
-      next();
-    });
+function runPrismaDbPushIfNeeded() {
+  if (process.env.VERCEL !== '1') return;
+  const flag = '/tmp/.signproz_schema';
+  if (fs.existsSync(flag)) return;
+  const prismaCli = path.join(root, 'node_modules', 'prisma', 'build', 'index.js');
+  if (!fs.existsSync(prismaCli)) {
+    console.error('[bootstrap] prisma CLI not found at', prismaCli);
+    return;
   }
+  const r = spawnSync(
+    process.execPath,
+    [prismaCli, 'db', 'push', '--skip-generate', '--accept-data-loss'],
+    { cwd: root, env: process.env, encoding: 'utf8' }
+  );
+  if (r.status !== 0) {
+    console.error('[bootstrap] prisma db push failed:', r.stderr || r.stdout);
+    return;
+  }
+  fs.writeFileSync(flag, '1', 'utf8');
+}
 
+let initPromise;
+async function ensureInit() {
+  if (!initPromise) {
+    initPromise = (async () => {
+      runPrismaDbPushIfNeeded();
+      await prisma.$connect();
+      await ensureAdminUser();
+    })();
+  }
+  await initPromise;
+}
+
+const app = express();
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '12mb' }));
+
+app.use(async (_req, res, next) => {
+  try {
+    await ensureInit();
+    next();
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server failed to initialize' });
+  }
+});
+
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/affiliate', affiliateRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/admin', adminRoutes);
+
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'signproz' }));
+
+if (fs.existsSync(publicDir)) {
+  const sendDemo = (_req, res) => {
+    const demo = path.join(publicDir, 'demo.html');
+    if (fs.existsSync(demo)) return res.sendFile(demo);
+    res.status(404).type('text').send('demo.html missing');
+  };
+  app.get('/demo', sendDemo);
+  app.get('/demo/', sendDemo);
+  app.use(express.static(publicDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    const index = path.join(publicDir, 'index.html');
+    if (fs.existsSync(index)) return res.sendFile(index);
+    next();
+  });
+}
+
+async function listenLocal() {
+  await ensureInit();
   const port = Number(process.env.PORT || 3000);
   app.listen(port, () => {
     console.log(`SignProz live at http://localhost:${port}`);
@@ -95,7 +139,15 @@ async function main() {
   });
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+const entryPath =
+  process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href;
+const isMainModule = import.meta.url === entryPath;
+
+if (isMainModule && process.env.VERCEL !== '1') {
+  listenLocal().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
+
+export default app;

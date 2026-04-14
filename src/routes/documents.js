@@ -8,7 +8,10 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { sendDocumentNotificationEmail } from '../lib/mail.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadRoot = path.join(__dirname, '../../uploads');
+const uploadRoot =
+  process.env.VERCEL === '1'
+    ? '/tmp/signproz-uploads'
+    : path.join(__dirname, '../../uploads');
 
 const router = Router();
 

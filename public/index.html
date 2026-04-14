@@ -145,7 +145,10 @@
       if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
       const r = await fetch(API_BASE + path, { ...opts, headers });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || r.statusText || 'Request failed');
+      if (!r.ok) {
+        const hint = data.error || r.statusText || `HTTP ${r.status}`;
+        throw new Error(hint || 'Request failed');
+      }
       return data;
     }
     function applyServerUser(u) {
