@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>SignProz | Smart eSignature Platform</title>
+  <title>SignProz Demo | Smart eSignature Platform</title>
   <!-- Tailwind + Font Awesome + Google Fonts -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -133,12 +133,12 @@
     
     const API_BASE = '';
     let authToken =
-      localStorage.getItem('signproz_token') || localStorage.getItem('signflow_token') || null;
+      localStorage.getItem('signproz_demo_token') || null;
     function setAuthToken(t) {
       authToken = t;
-      localStorage.removeItem('signflow_token');
-      if (t) localStorage.setItem('signproz_token', t);
-      else localStorage.removeItem('signproz_token');
+      localStorage.removeItem('signproz_demo_token');
+      if (t) localStorage.setItem('signproz_demo_token', t);
+      else localStorage.removeItem('signproz_demo_token');
     }
     async function api(path, opts = {}) {
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
@@ -735,7 +735,7 @@
     }
 
     function renderFooter() { 
-      return `<footer class="bg-white border-t mt-12"><div class="max-w-7xl mx-auto px-4 py-6 text-xs text-gray-500 flex flex-wrap justify-between items-center gap-4"><div>© 2026 SignProz Inc. | Secure OTP Verification | Earn 20-30% recurring affiliate commissions</div><div class="flex flex-wrap gap-4 items-center"><button data-nav="affiliate" class="text-blue-600 hover:text-blue-700 font-medium">Affiliate program</button><a href="/demo" class="text-blue-600 hover:text-blue-700 font-medium">Demo</a><button data-nav="about" class="text-gray-500 hover:text-blue-600">About</button><button data-nav="privacy" class="text-gray-500 hover:text-blue-600">Privacy</button><button data-nav="terms" class="text-gray-500 hover:text-blue-600">Terms</button></div></div></footer>`;
+      return `<footer class="bg-white border-t mt-12"><div class="max-w-7xl mx-auto px-4 py-6 text-xs text-gray-500 flex flex-wrap justify-between items-center gap-4"><div>© 2026 SignProz Inc. | Secure OTP Verification | Earn 20-30% recurring affiliate commissions</div><div class="flex flex-wrap gap-4 items-center"><button data-nav="affiliate" class="text-blue-600 hover:text-blue-700 font-medium">Affiliate program</button><a href="/" class="text-blue-600 hover:text-blue-700 font-medium">Production</a><button data-nav="about" class="text-gray-500 hover:text-blue-600">About</button><button data-nav="privacy" class="text-gray-500 hover:text-blue-600">Privacy</button><button data-nav="terms" class="text-gray-500 hover:text-blue-600">Terms</button></div></div></footer>`;
     }
 
     async function refreshAdminPanel() {
@@ -926,6 +926,7 @@
   </script>
 </body>
 </html>
+
 
 
 

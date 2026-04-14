@@ -70,6 +70,10 @@ async function main() {
     app.use(express.static(publicDir));
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) return next();
+      if (req.path === '/demo') {
+        const demo = path.join(publicDir, 'demo.html');
+        if (fs.existsSync(demo)) return res.sendFile(demo);
+      }
       const index = path.join(publicDir, 'index.html');
       if (fs.existsSync(index)) return res.sendFile(index);
       next();
