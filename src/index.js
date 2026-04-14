@@ -100,13 +100,13 @@ app.use(async (_req, res, next) => {
   }
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/affiliate', affiliateRoutes);
-app.use('/api/documents', documentRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/signproz-api/auth', authRoutes);
+app.use('/signproz-api/user', userRoutes);
+app.use('/signproz-api/affiliate', affiliateRoutes);
+app.use('/signproz-api/documents', documentRoutes);
+app.use('/signproz-api/admin', adminRoutes);
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'signproz' }));
+app.get('/signproz-api/health', (_req, res) => res.json({ ok: true, service: 'signproz' }));
 
 if (fs.existsSync(publicDir)) {
   const sendDemo = (_req, res) => {
@@ -118,7 +118,7 @@ if (fs.existsSync(publicDir)) {
   app.get('/demo/', sendDemo);
   app.use(express.static(publicDir));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/signproz-api')) return next();
     const index = path.join(publicDir, 'index.html');
     if (fs.existsSync(index)) return res.sendFile(index);
     next();

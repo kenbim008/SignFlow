@@ -173,9 +173,9 @@
     async function hydrateSession() {
       if (!authToken) return;
       try {
-        const d = await api('/api/user/me');
+        const d = await api('/signproz-api/user/me');
         applyServerUser(d.user);
-        const ar = await api('/api/affiliate/referrals');
+        const ar = await api('/signproz-api/affiliate/referrals');
         affiliateReferrals = ar.referrals || [];
         monthlyDocumentCount = currentUser.monthlyDocCount || 0;
       } catch {
@@ -217,7 +217,7 @@
         return false;
       }
       try {
-        await api('/api/auth/signup/request', {
+        await api('/signproz-api/auth/signup/request', {
           method: 'POST',
           body: JSON.stringify({
             email: email.trim().toLowerCase(),
@@ -242,7 +242,7 @@
         return false;
       }
       try {
-        await api('/api/auth/login/request', {
+        await api('/signproz-api/auth/login/request', {
           method: 'POST',
           body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
         });
@@ -264,7 +264,7 @@
       }
       try {
         if (pendingAction === 'signup') {
-          const out = await api('/api/auth/signup/verify', {
+          const out = await api('/signproz-api/auth/signup/verify', {
             method: 'POST',
             body: JSON.stringify({ email: pendingEmail, code }),
           });
@@ -282,13 +282,13 @@
           return true;
         }
         if (pendingAction === 'login') {
-          const out = await api('/api/auth/login/verify', {
+          const out = await api('/signproz-api/auth/login/verify', {
             method: 'POST',
             body: JSON.stringify({ email: pendingEmail, code }),
           });
           setAuthToken(out.token);
           applyServerUser(out.user);
-          const ar = await api('/api/affiliate/referrals');
+          const ar = await api('/signproz-api/affiliate/referrals');
           affiliateReferrals = ar.referrals || [];
           signatureFields = [];
           auditLog = [];
@@ -313,7 +313,7 @@
       }
       try {
         if (pendingAction === 'signup') {
-          await api('/api/auth/signup/request', {
+          await api('/signproz-api/auth/signup/request', {
             method: 'POST',
             body: JSON.stringify({
               email: pendingEmail,
@@ -322,7 +322,7 @@
             }),
           });
         } else if (pendingAction === 'login') {
-          await api('/api/auth/login/request', {
+          await api('/signproz-api/auth/login/request', {
             method: 'POST',
             body: JSON.stringify({ email: pendingEmail, password: pendingPassword }),
           });
@@ -343,9 +343,9 @@
     async function loadSampleAffiliateData() {
       if (!currentUser) return;
       try {
-        const ar = await api('/api/affiliate/referrals');
+        const ar = await api('/signproz-api/affiliate/referrals');
         affiliateReferrals = ar.referrals || [];
-        const me = await api('/api/affiliate/summary');
+        const me = await api('/signproz-api/affiliate/summary');
         currentUser.referralCount = me.referralCount;
         currentUser.paidReferrals = me.paidReferrals;
         currentUser.referralEarnings = me.referralEarnings;
@@ -372,7 +372,7 @@
       }
       el.innerHTML = '<p class="text-gray-500 text-sm">Loading…</p>';
       try {
-        const { documents } = await api('/api/documents');
+        const { documents } = await api('/signproz-api/documents');
         cachedDocumentsList = documents || [];
         if (!cachedDocumentsList.length) {
           el.innerHTML =
@@ -395,7 +395,7 @@
           btn.addEventListener('click', async () => {
             if (!confirm('Delete this document?')) return;
             try {
-              await api('/api/documents/' + btn.getAttribute('data-id'), { method: 'DELETE' });
+              await api('/signproz-api/documents/' + btn.getAttribute('data-id'), { method: 'DELETE' });
               addAudit('Document deleted.');
               await refreshMyDocuments();
             } catch (e) {
@@ -409,7 +409,7 @@
     }
     async function downloadDocument(id, filename) {
       try {
-        const r = await fetch(API_BASE + '/api/documents/' + id + '/download', {
+        const r = await fetch(API_BASE + '/signproz-api/documents/' + id + '/download', {
           headers: { Authorization: 'Bearer ' + authToken },
         });
         if (!r.ok) {
@@ -450,7 +450,7 @@
     async function upgradeToUnlimited() {
       if (!currentUser) return;
       try {
-        const d = await api('/api/user/upgrade', {
+        const d = await api('/signproz-api/user/upgrade', {
           method: 'POST',
           body: JSON.stringify({ plan: 'unlimited' }),
         });
@@ -466,7 +466,7 @@
     async function upgradeToEnterprise() {
       if (!currentUser) return;
       try {
-        const d = await api('/api/user/upgrade', {
+        const d = await api('/signproz-api/user/upgrade', {
           method: 'POST',
           body: JSON.stringify({ plan: 'enterprise' }),
         });
@@ -619,7 +619,7 @@
         if (!checkFairUseLimit()) return;
         void (async () => {
           try {
-            const r = await api('/api/user/usage/signed-document', { method: 'POST', body: '{}' });
+            const r = await api('/signproz-api/user/usage/signed-document', { method: 'POST', body: '{}' });
             if (r.user) applyServerUser(r.user);
             monthlyDocumentCount = currentUser.monthlyDocCount || 0;
             if (currentUser.planType === 'free') {
@@ -632,7 +632,7 @@
             }
             try {
               const signerEmails = signers.map((s) => s.email).filter(Boolean);
-              await api('/api/documents/workspace', {
+              await api('/signproz-api/documents/workspace', {
                 method: 'POST',
                 body: JSON.stringify({
                   title: 'Signed workspace',
@@ -732,9 +732,9 @@
       if (!el) return;
       el.innerHTML = '<p class="text-gray-500 text-sm">Loading…</p>';
       try {
-        const stats = await api('/api/admin/stats');
-        const users = await api('/api/admin/users?limit=100');
-        const docs = await api('/api/admin/documents?limit=50');
+        const stats = await api('/signproz-api/admin/stats');
+        const users = await api('/signproz-api/admin/users?limit=100');
+        const docs = await api('/signproz-api/admin/documents?limit=50');
         el.innerHTML = `
           <div class="grid md:grid-cols-3 gap-4 mb-8">
             <div class="bg-white rounded-xl p-4 shadow border"><div class="text-2xl font-bold">${stats.users}</div><div class="text-xs text-gray-500">Users</div></div>
@@ -836,7 +836,7 @@
           const title = titleInp?.value?.trim();
           if (title) fd.append('title', title);
           try {
-            const r = await fetch(API_BASE + '/api/documents/upload', {
+            const r = await fetch(API_BASE + '/signproz-api/documents/upload', {
               method: 'POST',
               headers: { Authorization: 'Bearer ' + authToken },
               body: fd,

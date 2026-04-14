@@ -22,7 +22,7 @@ async function uniqueAffiliateCode() {
   throw new Error('Could not allocate affiliate code');
 }
 
-/** POST /api/auth/signup/request */
+/** POST /signproz-api/auth/signup/request */
 router.post('/signup/request', async (req, res) => {
   try {
     const { email, password, referralCode } = req.body || {};
@@ -62,7 +62,7 @@ router.post('/signup/request', async (req, res) => {
   }
 });
 
-/** POST /api/auth/signup/verify */
+/** POST /signproz-api/auth/signup/verify */
 router.post('/signup/verify', async (req, res) => {
   try {
     const { email, code } = req.body || {};
@@ -135,7 +135,7 @@ router.post('/signup/verify', async (req, res) => {
   }
 });
 
-/** POST /api/auth/login/request */
+/** POST /signproz-api/auth/login/request */
 router.post('/login/request', async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -170,7 +170,7 @@ router.post('/login/request', async (req, res) => {
   }
 });
 
-/** POST /api/auth/login/verify */
+/** POST /signproz-api/auth/login/verify */
 router.post('/login/verify', async (req, res) => {
   try {
     const { email, code } = req.body || {};

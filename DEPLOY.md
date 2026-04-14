@@ -99,10 +99,10 @@ Persisted data: Docker volumes for `./data` and `./uploads`.
 
 | Area | Routes |
 |------|--------|
-| Auth | `POST /api/auth/signup/request`, `POST /api/auth/signup/verify`, `POST /api/auth/login/request`, `POST /api/auth/login/verify` |
-| User | `GET /api/user/me`, `POST /api/user/upgrade`, `POST /api/user/usage/signed-document` |
-| Affiliate | `GET /api/affiliate/summary`, `GET /api/affiliate/referrals` |
-| Documents | `GET /api/documents`, `POST /api/documents/workspace`, `POST /api/documents/upload`, `GET /api/documents/:id/download`, `DELETE /api/documents/:id` |
-| Admin | `GET /api/admin/stats`, `GET /api/admin/users`, `GET /api/admin/documents`, `PATCH /api/admin/users/:id` |
+| Auth | `POST /signproz-api/auth/signup/request`, `POST /signproz-api/auth/signup/verify`, `POST /signproz-api/auth/login/request`, `POST /signproz-api/auth/login/verify` |
+| User | `GET /signproz-api/user/me`, `POST /signproz-api/user/upgrade`, `POST /signproz-api/user/usage/signed-document` |
+| Affiliate | `GET /signproz-api/affiliate/summary`, `GET /signproz-api/affiliate/referrals` |
+| Documents | `GET /signproz-api/documents`, `POST /signproz-api/documents/workspace`, `POST /signproz-api/documents/upload`, `GET /signproz-api/documents/:id/download`, `DELETE /signproz-api/documents/:id` |
+| Admin | `GET /signproz-api/admin/stats`, `GET /signproz-api/admin/users`, `GET /signproz-api/admin/documents`, `PATCH /signproz-api/admin/users/:id` |
 
 All authenticated routes expect `Authorization: Bearer <token>`.
