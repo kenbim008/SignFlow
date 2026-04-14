@@ -1,4 +1,4 @@
-# SignFlow: go live
+# SignProz: go live
 
 The app is a single Node process: REST API + SQLite + static `public/index.html`.
 
@@ -10,25 +10,25 @@ The app is a single Node process: REST API + SQLite + static `public/index.html`
 4. `npm start`
 5. Open `http://localhost:3000` (not `file://` — the SPA must call the API on the same origin, or configure CORS and `API_BASE` in the frontend).
 
-**Default admin (from `.env`):** `admin@signflow.local` / `ChangeMe123!` — change in production.
+**Default admin (from `.env`):** `admin@signproz.local` / `ChangeMe123!` — change in production.
 
 **Email / OTP:** Configure **Resend** (`RESEND_API_KEY`) or **SMTP** (`SMTP_HOST`, …). If neither is set, messages are printed to the server console only. See **Email** below.
 
 ## Email configuration
 
-SignFlow sends: **signup/login OTP**, **welcome** (after signup), and **document** notifications (workspace save / signers).
+SignProz sends: **signup/login OTP**, **welcome** (after signup), and **document** notifications (workspace save / signers).
 
 ### Option A — Resend (recommended for quick setup)
 
 1. Create a free account at [Resend](https://resend.com) and an **API key**.
-2. For production, **verify a domain** and use e.g. `SignFlow <noreply@yourdomain.com>` as `RESEND_FROM`.
-3. For local tests only, you can use Resend’s sandbox sender: `SignFlow <onboarding@resend.dev>` (can only send to your own verified recipient email in the Resend dashboard until a domain is verified).
+2. For production, **verify a domain** and use e.g. `SignProz <noreply@yourdomain.com>` as `RESEND_FROM`.
+3. For local tests only, you can use Resend’s sandbox sender: `SignProz <onboarding@resend.dev>` (can only send to your own verified recipient email in the Resend dashboard until a domain is verified).
 
 In `.env`:
 
 ```env
 RESEND_API_KEY=re_xxxxxxxx
-RESEND_FROM=SignFlow <onboarding@resend.dev>
+RESEND_FROM=SignProz <onboarding@resend.dev>
 ```
 
 Restart the server after changing `.env`.
@@ -47,7 +47,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=you@gmail.com
 SMTP_PASS=your-16-char-app-password
-SMTP_FROM=SignFlow <you@gmail.com>
+SMTP_FROM=SignProz <you@gmail.com>
 ```
 
 **Outlook / Microsoft 365**
@@ -58,7 +58,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=you@outlook.com
 SMTP_PASS=your-password
-SMTP_FROM=SignFlow <you@outlook.com>
+SMTP_FROM=SignProz <you@outlook.com>
 ```
 
 **SendGrid** (SMTP relay)
@@ -68,7 +68,7 @@ SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
 SMTP_PASS=your-sendgrid-api-key
-SMTP_FROM=SignFlow <verified-sender@yourdomain.com>
+SMTP_FROM=SignProz <verified-sender@yourdomain.com>
 ```
 
 If `RESEND_API_KEY` is set, **Resend takes priority** over SMTP.

@@ -61,8 +61,8 @@ router.post('/workspace', requireAuth, async (req, res) => {
   for (const to of emails) {
     await sendDocumentNotificationEmail(
       to,
-      'SignFlow document update',
-      `A document workspace "${t}" was saved. Log in to SignFlow to review.`
+      'SignProz document update',
+      `A document workspace "${t}" was saved. Log in to SignProz to review.`
     );
   }
 

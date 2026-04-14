@@ -7,5 +7,5 @@ export function tierFromCount(referralCount) {
 
 export function generateAffiliateCode() {
   const n = Math.random().toString(36).substring(2, 10).toUpperCase();
-  return `SF-${n}`;
+  return `SPZ-${n}`;
 }

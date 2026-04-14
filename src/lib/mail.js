@@ -1,9 +1,18 @@
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 let transporter = null;
+let resendClient = null;
+
+function getResend() {
+  const key = process.env.RESEND_API_KEY?.trim();
+  if (!key) return null;
+  if (!resendClient) resendClient = new Resend(key);
+  return resendClient;
+}
 
 function getTransporter() {
   if (transporter) return transporter;
@@ -25,7 +34,7 @@ function getTransporter() {
 const defaultFrom = () =>
   process.env.RESEND_FROM?.trim() ||
   process.env.SMTP_FROM?.trim() ||
-  'SignFlow <onboarding@resend.dev>';
+  'SignProz <onboarding@resend.dev>';
 
 /**
  * How outbound mail is configured (for startup logs).
@@ -38,34 +47,28 @@ export function getMailTransport() {
 }
 
 async function sendViaResend({ to, subject, text, html }) {
-  const key = process.env.RESEND_API_KEY?.trim();
-  if (!key) return null;
+  const client = getResend();
+  if (!client) return null;
 
   const from = defaultFrom();
   const toList = Array.isArray(to) ? to : [to];
   const htmlBody =
     html || (text ? `<pre style="font-family:system-ui">${escapeHtml(text)}</pre>` : undefined);
 
-  const r = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: toList,
-      subject,
-      text: text || undefined,
-      html: htmlBody,
-    }),
+  const { data, error } = await client.emails.send({
+    from,
+    to: toList,
+    subject,
+    text: text || undefined,
+    html: htmlBody,
   });
 
-  if (!r.ok) {
-    const errBody = await r.text();
-    throw new Error(`Resend API error (${r.status}): ${errBody.slice(0, 500)}`);
+  if (error) {
+    throw new Error(
+      `Resend: ${error.message || error.name || 'send failed'}${error.statusCode != null ? ` (${error.statusCode})` : ''}`
+    );
   }
-  return { ok: true, mode: 'resend' };
+  return { ok: true, mode: 'resend', id: data?.id };
 }
 
 function escapeHtml(str) {
@@ -94,15 +97,15 @@ export async function sendMail({ to, subject, text, html: htmlIn }) {
 
 export async function sendOtpEmail(email, code, purpose) {
   const subject =
-    purpose === 'SIGNUP' ? 'Verify your SignFlow account' : 'Your SignFlow sign-in code';
+    purpose === 'SIGNUP' ? 'Verify your SignProz account' : 'Your SignProz sign-in code';
   const text = `Your verification code is: ${code}\n\nIt expires in 10 minutes.\n\nIf you did not request this, ignore this email.`;
   return sendMail({ to: email, subject, text });
 }
 
 export async function sendWelcomeEmail(email, affiliateCode) {
   const base = process.env.APP_PUBLIC_URL || 'http://localhost:3000';
-  const text = `Welcome to SignFlow!\n\nYour affiliate code: ${affiliateCode}\nShare: ${base}/?ref=${encodeURIComponent(affiliateCode)}\n`;
-  return sendMail({ to: email, subject: 'Welcome to SignFlow', text });
+  const text = `Welcome to SignProz!\n\nYour affiliate code: ${affiliateCode}\nShare: ${base}/?ref=${encodeURIComponent(affiliateCode)}\n`;
+  return sendMail({ to: email, subject: 'Welcome to SignProz', text });
 }
 
 export async function sendDocumentNotificationEmail(to, subject, text) {

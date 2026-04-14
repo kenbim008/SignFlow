@@ -64,7 +64,7 @@ async function main() {
   app.use('/api/documents', documentRoutes);
   app.use('/api/admin', adminRoutes);
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'signflow' }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'signproz' }));
 
   if (fs.existsSync(publicDir)) {
     app.use(express.static(publicDir));
@@ -78,7 +78,7 @@ async function main() {
 
   const port = Number(process.env.PORT || 3000);
   app.listen(port, () => {
-    console.log(`SignFlow live at http://localhost:${port}`);
+    console.log(`SignProz live at http://localhost:${port}`);
     const mail = getMailTransport();
     if (mail === 'console') {
       console.log('[email] No RESEND_API_KEY or SMTP_HOST — OTPs and mail are logged to the console only');
