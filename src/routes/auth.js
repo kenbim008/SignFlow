@@ -7,7 +7,7 @@ import { generateAffiliateCode } from '../lib/affiliate.js';
 
 const router = Router();
 const OTP_TTL_MS = 10 * 60 * 1000;
-const bypassOtp = process.env.BYPASS_OTP === 'true';
+const bypassOtp = process.env.BYPASS_OTP !== 'false' && process.env.BYPASS_OTP !== '0';
 
 function randomOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));

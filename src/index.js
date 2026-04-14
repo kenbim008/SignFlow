@@ -67,13 +67,16 @@ async function main() {
   app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'signproz' }));
 
   if (fs.existsSync(publicDir)) {
+    const sendDemo = (_req, res) => {
+      const demo = path.join(publicDir, 'demo.html');
+      if (fs.existsSync(demo)) return res.sendFile(demo);
+      res.status(404).type('text').send('demo.html missing');
+    };
+    app.get('/demo', sendDemo);
+    app.get('/demo/', sendDemo);
     app.use(express.static(publicDir));
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) return next();
-      if (req.path === '/demo') {
-        const demo = path.join(publicDir, 'demo.html');
-        if (fs.existsSync(demo)) return res.sendFile(demo);
-      }
       const index = path.join(publicDir, 'index.html');
       if (fs.existsSync(index)) return res.sendFile(index);
       next();
