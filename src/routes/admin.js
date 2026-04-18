@@ -64,7 +64,7 @@ router.get('/documents', async (req, res) => {
       id: d.id,
       title: d.title,
       filename: d.filename,
-      userEmail: d.user.email,
+      userEmail: d.user?.email ?? '(guest)',
       sizeBytes: d.sizeBytes,
       createdAt: d.createdAt,
     })),

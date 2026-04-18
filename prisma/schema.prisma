@@ -52,18 +52,20 @@ model EmailOtp {
 }
 
 model Document {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title        String
-  filename     String
-  storedPath   String?
-  mimeType     String?
-  fieldData    String
-  sizeBytes    Int      @default(0)
-  createdAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSessionId String?
+  title          String
+  filename       String
+  storedPath     String?
+  mimeType       String?
+  fieldData      String
+  sizeBytes      Int      @default(0)
+  createdAt      DateTime @default(now())
 
   @@index([userId])
+  @@index([guestSessionId])
 }
 
 model Referral {

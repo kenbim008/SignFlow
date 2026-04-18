@@ -30,6 +30,118 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
+const MAX_GUEST_DOCUMENTS = 10;
+
+function guestSessionHeader(req) {
+  const raw = req.headers['x-guest-session'];
+  return typeof raw === 'string' && raw.length >= 8 && raw.length <= 128 ? raw.trim() : null;
+}
+
+router.get('/guest/list', async (req, res) => {
+  const sid = guestSessionHeader(req);
+  if (!sid) return res.status(400).json({ error: 'Missing X-Guest-Session header' });
+  const documents = await prisma.document.findMany({
+    where: { guestSessionId: sid, userId: null },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      filename: true,
+      mimeType: true,
+      sizeBytes: true,
+      createdAt: true,
+    },
+  });
+  res.json({ documents });
+});
+
+router.post('/guest/upload', upload.single('file'), async (req, res) => {
+  const sid = guestSessionHeader(req);
+  if (!sid) return res.status(400).json({ error: 'Missing X-Guest-Session header' });
+  if (!req.file) return res.status(400).json({ error: 'file required' });
+  const count = await prisma.document.count({
+    where: { guestSessionId: sid, userId: null },
+  });
+  if (count >= MAX_GUEST_DOCUMENTS) {
+    return res.status(429).json({
+      error: `You can upload up to ${MAX_GUEST_DOCUMENTS} documents before creating a free account.`,
+    });
+  }
+  const title = String(req.body.title || req.file.originalname).slice(0, 200);
+  const fieldData = req.body.fieldData
+    ? String(req.body.fieldData)
+    : JSON.stringify({ note: 'Guest upload — sign up to send for signature' });
+
+  const doc = await prisma.document.create({
+    data: {
+      userId: null,
+      guestSessionId: sid,
+      title,
+      filename: req.file.originalname,
+      storedPath: req.file.filename,
+      mimeType: req.file.mimetype,
+      sizeBytes: req.file.size,
+      fieldData,
+    },
+  });
+  res.json({
+    document: {
+      id: doc.id,
+      title: doc.title,
+      filename: doc.filename,
+      sizeBytes: doc.sizeBytes,
+      createdAt: doc.createdAt,
+    },
+  });
+});
+
+router.get('/guest/:id/download', async (req, res) => {
+  const sid = guestSessionHeader(req);
+  if (!sid) return res.status(400).json({ error: 'Missing X-Guest-Session header' });
+  const doc = await prisma.document.findFirst({
+    where: { id: req.params.id, guestSessionId: sid, userId: null },
+  });
+  if (!doc) return res.status(404).json({ error: 'Not found' });
+  if (!doc.storedPath) {
+    res.setHeader('Content-Type', 'application/json');
+    return res.send(doc.fieldData);
+  }
+  const fp = path.join(uploadRoot, doc.storedPath);
+  if (!fs.existsSync(fp)) return res.status(404).json({ error: 'File missing' });
+  res.download(fp, doc.filename);
+});
+
+router.delete('/guest/:id', async (req, res) => {
+  const sid = guestSessionHeader(req);
+  if (!sid) return res.status(400).json({ error: 'Missing X-Guest-Session header' });
+  const doc = await prisma.document.findFirst({
+    where: { id: req.params.id, guestSessionId: sid, userId: null },
+  });
+  if (!doc) return res.status(404).json({ error: 'Not found' });
+  if (doc.storedPath) {
+    const fp = path.join(uploadRoot, doc.storedPath);
+    try {
+      fs.unlinkSync(fp);
+    } catch {
+      /* ignore */
+    }
+  }
+  await prisma.document.delete({ where: { id: doc.id } });
+  res.json({ ok: true });
+});
+
+router.post('/claim-guest', requireAuth, async (req, res) => {
+  const sid =
+    (typeof req.body?.guestSessionId === 'string' && req.body.guestSessionId.trim()) ||
+    guestSessionHeader(req);
+  if (!sid) return res.json({ claimed: 0 });
+  const result = await prisma.document.updateMany({
+    where: { guestSessionId: sid, userId: null },
+    data: { userId: req.user.id, guestSessionId: null },
+  });
+  res.json({ claimed: result.count });
+});
+
 router.get('/', requireAuth, async (req, res) => {
   const docs = await prisma.document.findMany({
     where: { userId: req.user.id },

@@ -26,6 +26,29 @@
     .tier-platinum { background: linear-gradient(135deg, #e5e4e2 0%, #b0b0b0 100%); }
     .projection-table td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; }
     .otp-input { letter-spacing: 8px; font-size: 24px; text-align: center; }
+    :root {
+      --signproz-orange: #ff4d20;
+      --signproz-sidebar-width: 260px;
+    }
+    .signproz-app-sidebar {
+      width: var(--signproz-sidebar-width);
+      min-height: calc(100vh - 120px);
+      background: #fff;
+      border-right: 1px solid #e5e7eb;
+    }
+    .signproz-upload-cta {
+      background-color: var(--signproz-orange);
+      color: #fff;
+      border: none;
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      font-size: 14px;
+      transition: filter 0.15s;
+    }
+    .signproz-upload-cta:hover { filter: brightness(0.95); }
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-gray-100">
@@ -120,6 +143,40 @@
     
     const PRO_MONTHLY_LIMIT = 200;
     const FREE_TIER_LIMIT = 3;
+    const GUEST_SESSION_KEY = 'signproz_guest_session';
+
+    function getGuestSessionId() {
+      let id = localStorage.getItem(GUEST_SESSION_KEY);
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem(GUEST_SESSION_KEY, id);
+      }
+      return id;
+    }
+    function clearGuestSession() {
+      localStorage.removeItem(GUEST_SESSION_KEY);
+    }
+
+    async function claimGuestDocuments() {
+      const sid = localStorage.getItem(GUEST_SESSION_KEY);
+      if (!sid || !authToken) return;
+      try {
+        const r = await fetch(API_BASE + '/signproz-api/documents/claim-guest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + authToken,
+          },
+          body: JSON.stringify({ guestSessionId: sid }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok && data.claimed > 0) {
+          addAudit(`Moved ${data.claimed} guest file(s) into your account.`);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     
     let templates = [
       { id: 't1', name: 'NDA Agreement', fields: [{ leftPercent: 35, topPercent: 55 }, { leftPercent: 65, topPercent: 55 }], signerCount: 2 },
@@ -177,6 +234,8 @@
       try {
         const d = await api('/signproz-api/user/me');
         applyServerUser(d.user);
+        await claimGuestDocuments();
+        clearGuestSession();
         const ar = await api('/signproz-api/affiliate/referrals');
         affiliateReferrals = ar.referrals || [];
         monthlyDocumentCount = currentUser.monthlyDocCount || 0;
@@ -280,6 +339,8 @@
           addAudit(`Welcome ${currentUser.email}! Account verified.`);
           document.getElementById('otpModal').classList.add('hidden');
           clearOTPState();
+          await claimGuestDocuments();
+          clearGuestSession();
           setActivePage('dashboard');
           return true;
         }
@@ -298,6 +359,8 @@
           addAudit(`Logged in as ${pendingEmail} (OTP verified).`);
           document.getElementById('otpModal').classList.add('hidden');
           clearOTPState();
+          await claimGuestDocuments();
+          clearGuestSession();
           setActivePage('dashboard');
           return true;
         }
@@ -413,6 +476,87 @@
       try {
         const r = await fetch(API_BASE + '/signproz-api/documents/' + id + '/download', {
           headers: { Authorization: 'Bearer ' + authToken },
+        });
+        if (!r.ok) {
+          let msg = 'Download failed';
+          try {
+            const j = await r.json();
+            if (j.error) msg = j.error;
+          } catch {
+            /* ignore */
+          }
+          throw new Error(msg);
+        }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename || 'download';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert(e.message || 'Download failed');
+      }
+    }
+
+    async function refreshGuestDocuments() {
+      const el = document.getElementById('guestDocumentsMount');
+      if (!el) return;
+      el.innerHTML = '<p class="text-gray-500 text-sm">Loading…</p>';
+      const sid = getGuestSessionId();
+      try {
+        const r = await fetch(API_BASE + '/signproz-api/documents/guest/list', {
+          headers: { 'X-Guest-Session': sid },
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || 'Could not load guest documents');
+        const list = data.documents || [];
+        if (!list.length) {
+          el.innerHTML =
+            '<p class="text-gray-400 text-sm">No files yet. Upload a document to try the flow — sign up free to send it for signature.</p>';
+          return;
+        }
+        el.innerHTML = `<div class="overflow-x-auto border border-gray-200 rounded-xl bg-white"><table class="w-full text-sm"><thead><tr class="bg-gray-50 text-left"><th class="p-2">Title</th><th class="p-2">File</th><th class="p-2">Size</th><th class="p-2 text-right">Actions</th></tr></thead><tbody>${list
+          .map(
+            (d) =>
+              `<tr class="border-t border-gray-100"><td class="p-2">${escapeHtml(d.title)}</td><td class="p-2 font-mono text-xs max-w-[120px] truncate">${escapeHtml(d.filename)}</td><td class="p-2 whitespace-nowrap">${formatBytes(d.sizeBytes)}</td><td class="p-2 text-right whitespace-nowrap"><button type="button" class="text-blue-600 hover:underline guest-dl-btn mr-2" data-id="${escapeHtml(d.id)}">Download</button><button type="button" class="text-red-600 hover:underline guest-del-btn" data-id="${escapeHtml(d.id)}">Remove</button></td></tr>`
+          )
+          .join('')}</tbody></table></div><p class="text-xs text-amber-800 mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"><i class="fas fa-info-circle"></i> <strong>Next step:</strong> create a free account to place signature fields and send for signature.</p>`;
+        el.querySelectorAll('.guest-dl-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            const meta = list.find((x) => x.id === id);
+            downloadGuestDocument(id, meta?.filename || 'download');
+          });
+        });
+        el.querySelectorAll('.guest-del-btn').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            if (!confirm('Remove this file from your guest session?')) return;
+            try {
+              const rr = await fetch(API_BASE + '/signproz-api/documents/guest/' + btn.getAttribute('data-id'), {
+                method: 'DELETE',
+                headers: { 'X-Guest-Session': sid },
+              });
+              const j = await rr.json().catch(() => ({}));
+              if (!rr.ok) throw new Error(j.error || 'Delete failed');
+              await refreshGuestDocuments();
+            } catch (e) {
+              alert(e.message || 'Delete failed');
+            }
+          });
+        });
+      } catch (e) {
+        el.innerHTML = `<p class="text-red-600 text-sm">${escapeHtml(e.message || 'Failed to load')}</p>`;
+      }
+    }
+
+    async function downloadGuestDocument(id, filename) {
+      const sid = getGuestSessionId();
+      try {
+        const r = await fetch(API_BASE + '/signproz-api/documents/guest/' + id + '/download', {
+          headers: { 'X-Guest-Session': sid },
         });
         if (!r.ok) {
           let msg = 'Download failed';
@@ -615,7 +759,11 @@
     }
 
     function checkDocumentCompletion() {
-      if (!currentUser) return;
+      if (!currentUser) {
+        alert('Create a free account to finalize and send documents for signature.');
+        setActivePage('signup');
+        return;
+      }
       const allSigned = signatureFields.length > 0 && signatureFields.every(f => f.signedData);
       if (allSigned && signatureFields.length) {
         if (!checkFairUseLimit()) return;
@@ -693,6 +841,38 @@
       const footer = renderFooter();
       root.innerHTML = `<div class="flex flex-col min-h-screen">${header} <main class="flex-grow">${mainContent}</main> ${footer}</div>`;
       attachGlobalEvents();
+      if (activePage === 'home') {
+        const guestBtn = document.getElementById('guestDocUploadBtn');
+        if (guestBtn) {
+          guestBtn.onclick = async () => {
+            const input = document.getElementById('guestDocUploadInput');
+            const titleInp = document.getElementById('guestDocTitle');
+            if (!input?.files?.length) {
+              alert('Choose a file first.');
+              return;
+            }
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+            const title = titleInp?.value?.trim();
+            if (title) fd.append('title', title);
+            try {
+              const r = await fetch(API_BASE + '/signproz-api/documents/guest/upload', {
+                method: 'POST',
+                headers: { 'X-Guest-Session': getGuestSessionId() },
+                body: fd,
+              });
+              const data = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(data.error || 'Upload failed');
+              input.value = '';
+              if (titleInp) titleInp.value = '';
+              await refreshGuestDocuments();
+            } catch (e) {
+              alert(e.message || 'Upload failed');
+            }
+          };
+        }
+        void refreshGuestDocuments();
+      }
       if (activePage === 'dashboard') { initDashboardEvents(); initCanvasDrawing(); }
       if (activePage === 'dashboard' && addFieldMode) document.getElementById('addModeBadge')?.classList.remove('hidden');
       if (activePage === 'admin') void refreshAdminPanel();
@@ -761,7 +941,18 @@
     }
 
     function renderHomePage() { 
-      return `<div class="max-w-6xl mx-auto px-4 py-12"><div class="text-center"><h1 class="text-5xl font-extrabold bg-gradient-to-r from-blue-800 to-indigo-600 bg-clip-text text-transparent">Sign. Send. Secure.</h1><p class="text-gray-600 text-lg mt-4 max-w-2xl mx-auto">Join SignProz with OTP verification for maximum security. Earn 20-30% recurring affiliate commissions.</p><div class="mt-8 flex gap-4 justify-center"><button type="button" data-nav="signup" class="btn-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg">Get Started →</button><button type="button" data-nav="login" class="border border-gray-300 px-6 py-3 rounded-xl font-medium">Sign In</button></div><div class="mt-16 grid md:grid-cols-3 gap-6"><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-shield-alt text-green-500 text-2xl"></i><h3 class="font-bold mt-3">OTP Verification</h3><p>Two-factor authentication for every login and signup.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-chart-line text-blue-500 text-2xl"></i><h3 class="font-bold mt-3">200 Docs/Month</h3><p>Only $29/month. 24x more value than DocuSign.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-hand-holding-usd text-purple-500 text-2xl"></i><h3 class="font-bold mt-3">Affiliate Program</h3><p>Earn 20-30% recurring commissions.</p><button type="button" id="viewProgramDetailsHomeBtn" class="mt-3 text-sm text-blue-600 font-medium hover:underline">View full program →</button></div></div><section class="hidden mt-20 max-w-4xl mx-auto space-y-6 px-2"><div class="text-center"><h2 class="text-2xl font-bold text-gray-800">SignProz Affiliate Program</h2><p class="text-sm text-gray-500 mt-1">Share SignProz. Earn every month when referrals upgrade.</p></div><div class="bg-blue-50 p-4 rounded-xl"><p class="text-sm text-gray-700">Earn <strong class="text-blue-700">20-30% recurring commission</strong> for every customer you refer who upgrades to a paid SignProz plan. No cap, lifetime earnings.</p></div><div><h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-chart-line text-green-600"></i> How It Works</h4><div class="grid md:grid-cols-3 gap-4 mt-3"><div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">1</span><p class="text-xs mt-1">Share your unique referral link</p></div><div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">2</span><p class="text-xs mt-1">Friend signs up & upgrades to Pro/Enterprise</p></div><div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">3</span><p class="text-xs mt-1">You earn 20-30% monthly recurring commission</p></div></div></div><div><h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-trophy text-yellow-600"></i> Affiliate Tiers</h4><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3"><div class="bg-amber-50 p-3 rounded-lg text-center border border-amber-200"><div class="w-10 h-10 rounded-full tier-bronze mx-auto flex items-center justify-center text-white font-bold">B</div><p class="font-bold mt-1">Bronze</p><p class="text-xs">0-4 referrals</p><p class="text-xs text-green-600">20% commission</p></div><div class="bg-gray-50 p-3 rounded-lg text-center border border-gray-200"><div class="w-10 h-10 rounded-full tier-silver mx-auto flex items-center justify-center text-white font-bold">S</div><p class="font-bold mt-1">Silver</p><p class="text-xs">5-14 referrals</p><p class="text-xs text-green-600">22% commission</p></div><div class="bg-yellow-50 p-3 rounded-lg text-center border border-yellow-200"><div class="w-10 h-10 rounded-full tier-gold mx-auto flex items-center justify-center text-white font-bold">G</div><p class="font-bold mt-1">Gold</p><p class="text-xs">15-49 referrals</p><p class="text-xs text-green-600">25% commission</p></div><div class="bg-gray-100 p-3 rounded-lg text-center border border-gray-300"><div class="w-10 h-10 rounded-full tier-platinum mx-auto flex items-center justify-center text-gray-800 font-bold">P</div><p class="font-bold mt-1">Platinum</p><p class="text-xs">50+ referrals</p><p class="text-xs text-green-600">30% commission</p></div></div></div><p class="text-center text-sm text-gray-500">For full details and FAQs, use <span class="text-blue-600 font-medium">Affiliate program</span> in the footer or the button on this card.</p></section></div></div>`;
+      return `<div class="max-w-6xl mx-auto px-4 py-12"><div class="text-center"><h1 class="text-5xl font-extrabold bg-gradient-to-r from-blue-800 to-indigo-600 bg-clip-text text-transparent">Sign. Send. Secure.</h1><p class="text-gray-600 text-lg mt-4 max-w-2xl mx-auto">Join SignProz with OTP verification for maximum security. Earn 20-30% recurring affiliate commissions.</p><div class="mt-8 flex gap-4 justify-center"><button type="button" data-nav="signup" class="btn-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg">Get Started →</button><button type="button" data-nav="login" class="border border-gray-300 px-6 py-3 rounded-xl font-medium">Sign In</button></div><div class="mt-16 grid md:grid-cols-3 gap-6"><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-shield-alt text-green-500 text-2xl"></i><h3 class="font-bold mt-3">OTP Verification</h3><p>Two-factor authentication for every login and signup.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-chart-line text-blue-500 text-2xl"></i><h3 class="font-bold mt-3">200 Docs/Month</h3><p>Only $29/month. 24x more value than DocuSign.</p></div><div class="bg-white p-6 rounded-2xl shadow-sm"><i class="fas fa-hand-holding-usd text-purple-500 text-2xl"></i><h3 class="font-bold mt-3">Affiliate Program</h3><p>Earn 20-30% recurring commissions.</p><button type="button" id="viewProgramDetailsHomeBtn" class="mt-3 text-sm text-blue-600 font-medium hover:underline">View full program →</button></div></div><section class="hidden mt-20 max-w-4xl mx-auto space-y-6 px-2"><div class="text-center"><h2 class="text-2xl font-bold text-gray-800">SignProz Affiliate Program</h2><p class="text-sm text-gray-500 mt-1">Share SignProz. Earn every month when referrals upgrade.</p></div><div class="bg-blue-50 p-4 rounded-xl"><p class="text-sm text-gray-700">Earn <strong class="text-blue-700">20-30% recurring commission</strong> for every customer you refer who upgrades to a paid SignProz plan. No cap, lifetime earnings.</p></div><div><h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-chart-line text-green-600"></i> How It Works</h4><div class="grid md:grid-cols-3 gap-4 mt-3"><div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">1</span><p class="text-xs mt-1">Share your unique referral link</p></div><div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">2</span><p class="text-xs mt-1">Friend signs up & upgrades to Pro/Enterprise</p></div><div class="bg-gray-50 p-3 rounded-lg text-center"><span class="bg-blue-600 text-white w-6 h-6 inline-flex items-center justify-center rounded-full text-sm font-bold">3</span><p class="text-xs mt-1">You earn 20-30% monthly recurring commission</p></div></div></div><div><h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-trophy text-yellow-600"></i> Affiliate Tiers</h4><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3"><div class="bg-amber-50 p-3 rounded-lg text-center border border-amber-200"><div class="w-10 h-10 rounded-full tier-bronze mx-auto flex items-center justify-center text-white font-bold">B</div><p class="font-bold mt-1">Bronze</p><p class="text-xs">0-4 referrals</p><p class="text-xs text-green-600">20% commission</p></div><div class="bg-gray-50 p-3 rounded-lg text-center border border-gray-200"><div class="w-10 h-10 rounded-full tier-silver mx-auto flex items-center justify-center text-white font-bold">S</div><p class="font-bold mt-1">Silver</p><p class="text-xs">5-14 referrals</p><p class="text-xs text-green-600">22% commission</p></div><div class="bg-yellow-50 p-3 rounded-lg text-center border border-yellow-200"><div class="w-10 h-10 rounded-full tier-gold mx-auto flex items-center justify-center text-white font-bold">G</div><p class="font-bold mt-1">Gold</p><p class="text-xs">15-49 referrals</p><p class="text-xs text-green-600">25% commission</p></div><div class="bg-gray-100 p-3 rounded-lg text-center border border-gray-300"><div class="w-10 h-10 rounded-full tier-platinum mx-auto flex items-center justify-center text-gray-800 font-bold">P</div><p class="font-bold mt-1">Platinum</p><p class="text-xs">50+ referrals</p><p class="text-xs text-green-600">30% commission</p></div></div></div><p class="text-center text-sm text-gray-500">For full details and FAQs, use <span class="text-blue-600 font-medium">Affiliate program</span> in the footer or the button on this card.</p></section>
+        <section class="mt-16 max-w-3xl mx-auto text-left border border-gray-200 rounded-2xl p-6 bg-white shadow-sm">
+          <h2 class="text-xl font-bold text-gray-900">Try it free — upload a document</h2>
+          <p class="text-gray-600 text-sm mt-2">Guests can upload files here to prepare. <strong class="text-gray-800">Create a free account</strong> to add signers, place fields, and send for signature.</p>
+          <div class="mt-4 flex flex-wrap gap-2 items-end">
+            <input type="file" id="guestDocUploadInput" class="text-sm border border-gray-200 rounded-lg p-2 bg-gray-50 max-w-[220px]">
+            <input type="text" id="guestDocTitle" placeholder="Title (optional)" class="text-sm border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[160px] bg-white">
+            <button type="button" id="guestDocUploadBtn" class="signproz-upload-cta px-5 py-2.5 w-auto rounded-lg shadow">Upload</button>
+          </div>
+          <div id="guestDocumentsMount" class="mt-4 text-sm min-h-[2rem]"></div>
+        </section>
+      </div></div>`;
     }
 
     function renderAffiliatePage() {
@@ -789,7 +980,7 @@
       if (!currentUser) return '<div class="p-10 text-center">Please login</div>';
       const tier = getAffiliateTier(currentUser.referralCount);
       const expectedPayout = (currentUser.paidReferrals || 0) * 5.80;
-      return `<div class="max-w-7xl mx-auto px-4 py-6"><div class="flex flex-wrap justify-between items-center mb-4"><div><h2 class="text-2xl font-bold">Affiliate Dashboard</h2><p class="text-sm text-gray-500">Welcome, ${currentUser.email} | Your code: <strong class="bg-gray-100 px-2 py-0.5 rounded">${currentUser.affiliateCode}</strong></p></div><div class="flex gap-2"><button id="copyAffiliateLinkBtn" class="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-link"></i> Copy Referral Link</button><button id="sampleDataBtn" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-sync-alt"></i> Refresh data</button></div></div><div class="grid lg:grid-cols-12 gap-6"><div class="lg:col-span-5"><div class="referral-stats-card rounded-2xl p-6 shadow-sm"><h3 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-gift text-purple-600"></i> Referrals & Rewards</h3><button type="button" data-nav="affiliate" class="text-blue-600 text-sm underline mb-4 inline-block">View program details →</button><div class="grid grid-cols-2 gap-4 mt-2"><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-gray-800">${currentUser.referralCount}</div><div class="text-xs text-gray-500">Total referrals</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-green-600">${currentUser.paidReferrals || 0}</div><div class="text-xs text-gray-500">Active (paid accounts)</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-blue-600">$${expectedPayout.toFixed(2)}</div><div class="text-xs text-gray-500">Expected payout</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-gray-800">$${currentUser.referralEarnings.toFixed(2)}</div><div class="text-xs text-gray-500">Paid out</div></div></div><div class="mt-4 flex items-center justify-between bg-white rounded-xl p-3"><span class="text-sm font-medium">Tier:</span><span class="px-3 py-1 rounded-full text-white text-sm ${tier.color}">${tier.name} (${tier.commission}% commission)</span></div><div class="mt-4 text-xs text-gray-500 text-center">Next payout: 15th of next month • Min. $50</div></div></div><div class="lg:col-span-7 bg-white rounded-2xl p-5 shadow-sm"><h3 class="font-bold mb-3"><i class="fas fa-chart-line"></i> 3-Year Earnings Projection</h3><p class="text-xs text-gray-500 mb-3">Based on realistic part-time effort (1-2 hours/week).</p><table class="w-full text-sm projection-table"><thead><tr class="bg-gray-50"><th class="text-left p-2">Year</th><th class="text-left p-2">New Referrals</th><th class="text-left p-2">Total</th><th class="text-left p-2">Earnings</th><th class="text-left p-2">Avg Monthly</th><th class="text-left p-2">End Monthly</th></tr></thead><tbody><tr><td class="p-2 font-medium">Year 1</td><td class="p-2">${revenueProjection.year1.newReferrals}</td><td class="p-2">${revenueProjection.year1.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year1.earnings}</td><td class="p-2">$${revenueProjection.year1.avgMonthly}</td><td class="p-2">$${revenueProjection.year1.endMonthly}</td></tr><tr><td class="p-2 font-medium">Year 2</td><td class="p-2">${revenueProjection.year2.newReferrals}</td><td class="p-2">${revenueProjection.year2.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year2.earnings}</td><td class="p-2">$${revenueProjection.year2.avgMonthly}</td><td class="p-2">$${revenueProjection.year2.endMonthly}</td></tr><tr><td class="p-2 font-medium">Year 3</td><td class="p-2">${revenueProjection.year3.newReferrals}</td><td class="p-2">${revenueProjection.year3.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year3.earnings}</td><td class="p-2">$${revenueProjection.year3.avgMonthly}</td><td class="p-2">$${revenueProjection.year3.endMonthly}</td></tr><tr class="bg-blue-50"><td class="p-2 font-bold">TOTAL</td><td class="p-2">${revenueProjection.total.referrals}</td><td class="p-2"></td><td class="p-2 font-bold text-blue-700">$${revenueProjection.total.earnings}</td><td class="p-2"></td><td class="p-2 font-bold">~$${revenueProjection.year3.endMonthly}/mo</td></tr></tbody></table><div class="mt-3 bg-green-50 p-3 rounded-lg"><p class="text-xs text-green-800"><i class="fas fa-info-circle"></i> <strong>Non-aggressive projection:</strong> Part-time effort (1-2 hours/week). OTP verification ensures account security.</p></div></div></div><div class="mt-6"><div class="bg-white rounded-2xl p-5 shadow-sm"><h3 class="font-bold mb-3"><i class="fas fa-file-signature"></i> Document Workspace</h3><div class="flex gap-2 mb-4"><button id="toggleAddModeBtn" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"><i class="fas fa-plus"></i> Add Signature Field</button><button id="resetDocumentBtn" class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">Clear Fields</button><button id="sendDocBtn" class="btn-primary text-white px-4 py-1 rounded-full text-sm">Finalize Document</button></div><div id="documentPreview" class="relative min-h-[300px] p-6 bg-gray-50 rounded-xl border" style="background-image: radial-gradient(#e5e7eb 0.5px, transparent 0.5px);"><div class="prose max-w-none text-sm pointer-events-none"><p class="text-center text-gray-400">Click "Add Signature Field" then click on this area to place signature tags.</p></div><div id="dynamicFieldsContainer" class="absolute inset-0 p-6 pointer-events-none"></div></div><div id="signersList" class="mt-3 flex flex-wrap gap-2"></div><button id="addSignerBtn" class="mt-2 text-xs bg-gray-100 px-3 py-1 rounded-full">+ Add Signer</button></div></div><div class="mt-6"><div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100"><h3 class="font-bold mb-3"><i class="fas fa-folder-open text-amber-600"></i> My documents</h3><p class="text-xs text-gray-500 mb-3">Upload files or download workspace JSON saved when you finalize signatures.</p><div class="flex flex-wrap gap-2 mb-4 items-center"><input type="file" id="docUploadInput" class="text-sm border border-gray-200 rounded-lg p-1 max-w-[220px]"><input type="text" id="docUploadTitle" placeholder="Title (optional)" class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 flex-1 min-w-[140px] max-w-xs"><button type="button" id="docUploadBtn" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">Upload</button><button type="button" id="refreshDocsListBtn" class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-sm" title="Refresh list"><i class="fas fa-sync-alt"></i></button></div><div id="myDocumentsMount" class="text-sm"></div></div></div></div>`;
+      return `<div class="flex flex-col lg:flex-row w-full max-w-[1680px] mx-auto min-h-[calc(100vh-120px)]"><aside class="signproz-app-sidebar shrink-0 flex flex-col p-5 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-80px)] lg:overflow-y-auto"><div class="mb-4"><div class="flex items-center gap-2 mb-4"><div class="bg-gradient-to-r from-blue-600 to-indigo-700 w-9 h-9 rounded-xl flex items-center justify-center shadow"><i class="fas fa-file-signature text-white text-lg"></i></div><span class="font-bold text-lg tracking-tight"><span class="text-blue-600">Sign</span><span class="text-indigo-600">Proz</span></span></div><button type="button" id="sidebarUploadForSignatureBtn" class="signproz-upload-cta mb-2">Upload documents for signatures</button><p class="text-xs text-gray-500">Add files, place fields, then finalize to send.</p></div><div class="mb-3"><label class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Get from cloud</label><select class="w-full mt-1 border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-500 bg-gray-50" disabled title="Coming soon"><option>Coming soon</option></select></div><nav class="flex-1 space-y-0.5 text-sm border-t border-gray-100 pt-4"><div class="text-[11px] font-bold text-gray-400 uppercase px-2 mb-2">Documents</div><button type="button" class="sidebar-scroll-btn w-full text-left px-3 py-2 rounded-lg bg-blue-50 text-blue-700 font-medium border-l-4 border-blue-500" data-scroll-target="dashWorkspaceSection">📄 Signature workspace</button><button type="button" class="sidebar-scroll-btn w-full text-left px-3 py-2 pl-8 rounded-lg text-gray-600 hover:bg-gray-50 text-xs" data-scroll-target="dashWorkspaceSection">Prepare & send</button><button type="button" class="sidebar-scroll-btn w-full text-left px-3 py-2 pl-8 rounded-lg text-gray-500 hover:bg-gray-50 text-xs" data-scroll-target="dashDocsSection">My uploads</button><div class="text-[11px] text-gray-400 px-3 py-1 pl-8">Waiting / Signed — coming soon</div><button type="button" data-nav="templates" class="w-full text-left px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 mt-2">📚 Templates</button><button type="button" class="w-full text-left px-3 py-2 rounded-lg text-gray-400 cursor-not-allowed text-sm" disabled title="Pro+">✉️ Bulk send</button><button type="button" class="w-full text-left px-3 py-2 rounded-lg text-gray-400 cursor-not-allowed text-sm" disabled>👥 Team</button><button type="button" class="w-full text-left px-3 py-2 rounded-lg text-gray-400 cursor-not-allowed text-sm" disabled>💬 AI <span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full ml-1">NEW</span></button></nav></aside><div class="flex-1 min-w-0 px-3 sm:px-5 py-5"><div class="w-full max-w-6xl mx-auto"><div class="flex flex-wrap justify-between items-center mb-4"><div><h2 class="text-2xl font-bold">Affiliate Dashboard</h2><p class="text-sm text-gray-500">Welcome, ${currentUser.email} | Your code: <strong class="bg-gray-100 px-2 py-0.5 rounded">${currentUser.affiliateCode}</strong></p></div><div class="flex gap-2"><button id="copyAffiliateLinkBtn" class="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-link"></i> Copy Referral Link</button><button id="sampleDataBtn" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-full text-sm"><i class="fas fa-sync-alt"></i> Refresh data</button></div></div><div class="grid lg:grid-cols-12 gap-6"><div class="lg:col-span-5"><div class="referral-stats-card rounded-2xl p-6 shadow-sm"><h3 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-gift text-purple-600"></i> Referrals & Rewards</h3><button type="button" data-nav="affiliate" class="text-blue-600 text-sm underline mb-4 inline-block">View program details →</button><div class="grid grid-cols-2 gap-4 mt-2"><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-gray-800">${currentUser.referralCount}</div><div class="text-xs text-gray-500">Total referrals</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-green-600">${currentUser.paidReferrals || 0}</div><div class="text-xs text-gray-500">Active (paid accounts)</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-blue-600">$${expectedPayout.toFixed(2)}</div><div class="text-xs text-gray-500">Expected payout</div></div><div class="bg-white rounded-xl p-3 text-center"><div class="text-3xl font-bold text-gray-800">$${currentUser.referralEarnings.toFixed(2)}</div><div class="text-xs text-gray-500">Paid out</div></div></div><div class="mt-4 flex items-center justify-between bg-white rounded-xl p-3"><span class="text-sm font-medium">Tier:</span><span class="px-3 py-1 rounded-full text-white text-sm ${tier.color}">${tier.name} (${tier.commission}% commission)</span></div><div class="mt-4 text-xs text-gray-500 text-center">Next payout: 15th of next month • Min. $50</div></div></div><div class="lg:col-span-7 bg-white rounded-2xl p-5 shadow-sm"><h3 class="font-bold mb-3"><i class="fas fa-chart-line"></i> 3-Year Earnings Projection</h3><p class="text-xs text-gray-500 mb-3">Based on realistic part-time effort (1-2 hours/week).</p><table class="w-full text-sm projection-table"><thead><tr class="bg-gray-50"><th class="text-left p-2">Year</th><th class="text-left p-2">New Referrals</th><th class="text-left p-2">Total</th><th class="text-left p-2">Earnings</th><th class="text-left p-2">Avg Monthly</th><th class="text-left p-2">End Monthly</th></tr></thead><tbody><tr><td class="p-2 font-medium">Year 1</td><td class="p-2">${revenueProjection.year1.newReferrals}</td><td class="p-2">${revenueProjection.year1.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year1.earnings}</td><td class="p-2">$${revenueProjection.year1.avgMonthly}</td><td class="p-2">$${revenueProjection.year1.endMonthly}</td></tr><tr><td class="p-2 font-medium">Year 2</td><td class="p-2">${revenueProjection.year2.newReferrals}</td><td class="p-2">${revenueProjection.year2.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year2.earnings}</td><td class="p-2">$${revenueProjection.year2.avgMonthly}</td><td class="p-2">$${revenueProjection.year2.endMonthly}</td></tr><tr><td class="p-2 font-medium">Year 3</td><td class="p-2">${revenueProjection.year3.newReferrals}</td><td class="p-2">${revenueProjection.year3.totalReferrals}</td><td class="p-2 text-green-700 font-semibold">$${revenueProjection.year3.earnings}</td><td class="p-2">$${revenueProjection.year3.avgMonthly}</td><td class="p-2">$${revenueProjection.year3.endMonthly}</td></tr><tr class="bg-blue-50"><td class="p-2 font-bold">TOTAL</td><td class="p-2">${revenueProjection.total.referrals}</td><td class="p-2"></td><td class="p-2 font-bold text-blue-700">$${revenueProjection.total.earnings}</td><td class="p-2"></td><td class="p-2 font-bold">~$${revenueProjection.year3.endMonthly}/mo</td></tr></tbody></table><div class="mt-3 bg-green-50 p-3 rounded-lg"><p class="text-xs text-green-800"><i class="fas fa-info-circle"></i> <strong>Non-aggressive projection:</strong> Part-time effort (1-2 hours/week). OTP verification ensures account security.</p></div></div></div><div class="mt-6 scroll-mt-24" id="dashWorkspaceSection"><div class="bg-white rounded-2xl p-5 shadow-sm"><h3 class="font-bold mb-3"><i class="fas fa-file-signature"></i> Document Workspace</h3><div class="flex gap-2 mb-4"><button id="toggleAddModeBtn" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"><i class="fas fa-plus"></i> Add Signature Field</button><button id="resetDocumentBtn" class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">Clear Fields</button><button id="sendDocBtn" class="btn-primary text-white px-4 py-1 rounded-full text-sm">Finalize Document</button></div><div id="documentPreview" class="relative min-h-[300px] p-6 bg-gray-50 rounded-xl border" style="background-image: radial-gradient(#e5e7eb 0.5px, transparent 0.5px);"><div class="prose max-w-none text-sm pointer-events-none"><p class="text-center text-gray-400">Click "Add Signature Field" then click on this area to place signature tags.</p></div><div id="dynamicFieldsContainer" class="absolute inset-0 p-6 pointer-events-none"></div></div><div id="signersList" class="mt-3 flex flex-wrap gap-2"></div><button id="addSignerBtn" class="mt-2 text-xs bg-gray-100 px-3 py-1 rounded-full">+ Add Signer</button></div></div><div class="mt-6 scroll-mt-24" id="dashDocsSection"><div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100"><h3 class="font-bold mb-3"><i class="fas fa-folder-open text-amber-600"></i> My documents</h3><p class="text-xs text-gray-500 mb-3">Upload files or download workspace JSON saved when you finalize signatures.</p><div class="flex flex-wrap gap-2 mb-4 items-center"><input type="file" id="docUploadInput" class="text-sm border border-gray-200 rounded-lg p-1 max-w-[220px]"><input type="text" id="docUploadTitle" placeholder="Title (optional)" class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 flex-1 min-w-[140px] max-w-xs"><button type="button" id="docUploadBtn" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">Upload</button><button type="button" id="refreshDocsListBtn" class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-sm" title="Refresh list"><i class="fas fa-sync-alt"></i></button></div><div id="myDocumentsMount" class="text-sm"></div></div></div></div></div>`;
     }
 
     function renderDashboardContent() {
@@ -809,7 +1000,16 @@
       const toggleBtn = document.getElementById('toggleAddModeBtn');
       if (toggleBtn) toggleBtn.onclick = () => { addFieldMode = !addFieldMode; document.getElementById('addModeBadge')?.classList.toggle('hidden'); };
       const sendBtn = document.getElementById('sendDocBtn');
-      if (sendBtn) sendBtn.onclick = () => { if (signatureFields.length === 0) alert('Add signature fields first'); else checkDocumentCompletion(); };
+      if (sendBtn)
+        sendBtn.onclick = () => {
+          if (!currentUser) {
+            alert('Create a free account to finalize and send documents for signature.');
+            setActivePage('signup');
+            return;
+          }
+          if (signatureFields.length === 0) alert('Add signature fields first');
+          else checkDocumentCompletion();
+        };
       const resetBtn = document.getElementById('resetDocumentBtn');
       if (resetBtn) resetBtn.onclick = () => { signatureFields = []; renderDashboardContent(); addAudit("Reset document fields."); };
       const copyBtn = document.getElementById('copyAffiliateLinkBtn');
@@ -855,6 +1055,19 @@
         };
       const refreshDocsListBtn = document.getElementById('refreshDocsListBtn');
       if (refreshDocsListBtn) refreshDocsListBtn.onclick = () => void refreshMyDocuments();
+      const sidebarUpload = document.getElementById('sidebarUploadForSignatureBtn');
+      if (sidebarUpload) {
+        sidebarUpload.onclick = () => {
+          document.getElementById('dashDocsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setTimeout(() => document.getElementById('docUploadInput')?.click(), 350);
+        };
+      }
+      document.querySelectorAll('.sidebar-scroll-btn').forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute('data-scroll-target');
+          if (id) document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+      });
       void refreshMyDocuments();
       renderDashboardContent();
     }
