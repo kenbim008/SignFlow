@@ -1,8 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+import { getSupabasePublicConfig } from './env';
 
 /**
  * Middleware Supabase client — refreshes the session (must call getUser after createServerClient).
@@ -15,7 +13,9 @@ export const createClient = async (request: NextRequest) => {
     },
   });
 
-  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
+  const { url, anonKey } = getSupabasePublicConfig();
+
+  const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
