@@ -10,7 +10,7 @@ const OTP_TTL_MS = 10 * 60 * 1000;
 const bypassOtp = process.env.BYPASS_OTP !== 'false' && process.env.BYPASS_OTP !== '0';
 
 function authErrorResponse(res, e) {
-  console.error(e);
+  console.error('[auth]', e?.code || '', e?.message || e);
   const code = e?.code;
   if (code === 'P1001' || code === 'P1017') {
     return res.status(503).json({
@@ -21,6 +21,11 @@ function authErrorResponse(res, e) {
   if (code === 'P2021' || code === 'P2022') {
     return res.status(503).json({
       error: 'Database schema is missing. Run: npx prisma migrate deploy (and ensure DATABASE_URL is set).',
+    });
+  }
+  if (code === 'P2002') {
+    return res.status(409).json({
+      error: 'A record with this value already exists. Try again or use a different email.',
     });
   }
   return res.status(500).json({ error: 'Server error' });
@@ -139,7 +144,11 @@ router.post('/signup/verify', async (req, res) => {
       return u;
     });
 
-    await sendWelcomeEmail(user.email, user.affiliateCode);
+    try {
+      await sendWelcomeEmail(user.email, user.affiliateCode);
+    } catch (mailErr) {
+      console.error('[auth] welcome email failed (account still created):', mailErr?.message || mailErr);
+    }
     const token = signUserToken(user);
     res.json({
       token,
