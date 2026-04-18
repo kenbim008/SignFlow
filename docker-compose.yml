@@ -1,25 +1,18 @@
+# Local PostgreSQL for SignProz — matches .env DATABASE_URL default.
+# Start Docker Desktop, then: npm run db:up
 services:
-  signproz:
-    build: .
-    ports:
-      - "3000:3000"
+  postgres:
+    image: postgres:16-alpine
+    container_name: signproz-pg
+    restart: unless-stopped
     environment:
-      DATABASE_URL: "file:./data/signflow.db"
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@signproz.local}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      RESEND_FROM: ${RESEND_FROM:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-SignProz <noreply@localhost>}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: signproz
+    ports:
+      - "5432:5432"
     volumes:
-      - signproz-data:/app/data
-      - signproz-uploads:/app/uploads
+      - signproz_pgdata:/var/lib/postgresql/data
 
 volumes:
-  signproz-data:
-  signproz-uploads:
+  signproz_pgdata:
