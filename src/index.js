@@ -4,7 +4,6 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
-import { spawnSync } from 'node:child_process';
 import bcrypt from 'bcryptjs';
 import { prisma } from './lib/prisma.js';
 import { generateAffiliateCode } from './lib/affiliate.js';
@@ -53,32 +52,10 @@ async function ensureAdminUser() {
   console.log('[bootstrap] Admin user created:', email);
 }
 
-function runPrismaDbPushIfNeeded() {
-  if (process.env.VERCEL !== '1') return;
-  const flag = '/tmp/.signproz_schema';
-  if (fs.existsSync(flag)) return;
-  const prismaCli = path.join(root, 'node_modules', 'prisma', 'build', 'index.js');
-  if (!fs.existsSync(prismaCli)) {
-    console.error('[bootstrap] prisma CLI not found at', prismaCli);
-    return;
-  }
-  const r = spawnSync(
-    process.execPath,
-    [prismaCli, 'db', 'push', '--skip-generate', '--accept-data-loss'],
-    { cwd: root, env: process.env, encoding: 'utf8' }
-  );
-  if (r.status !== 0) {
-    console.error('[bootstrap] prisma db push failed:', r.stderr || r.stdout);
-    return;
-  }
-  fs.writeFileSync(flag, '1', 'utf8');
-}
-
 let initPromise;
 async function ensureInit() {
   if (!initPromise) {
     initPromise = (async () => {
-      runPrismaDbPushIfNeeded();
       await prisma.$connect();
       await ensureAdminUser();
     })();

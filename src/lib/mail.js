@@ -81,17 +81,21 @@ function escapeHtml(str) {
 export async function sendMail({ to, subject, text, html: htmlIn }) {
   const html = htmlIn || (text ? `<pre style="font-family:system-ui">${escapeHtml(text)}</pre>` : undefined);
 
-  if (process.env.RESEND_API_KEY?.trim()) {
-    return sendViaResend({ to, subject, text, html });
+  try {
+    if (process.env.RESEND_API_KEY?.trim()) {
+      return await sendViaResend({ to, subject, text, html });
+    }
+
+    const tx = getTransporter();
+    if (tx) {
+      await tx.sendMail({ from: defaultFrom(), to, subject, text, html });
+      return { ok: true, mode: 'smtp' };
+    }
+  } catch (e) {
+    console.error('[email] send failed (signup/login will still succeed; check RESEND/SMTP):', e?.message || e);
   }
 
-  const tx = getTransporter();
-  if (tx) {
-    await tx.sendMail({ from: defaultFrom(), to, subject, text, html });
-    return { ok: true, mode: 'smtp' };
-  }
-
-  console.log('[email:not-configured]', { to, subject, text: text?.slice(0, 200) });
+  console.log('[email:fallback-console]', { to, subject, text: text?.slice(0, 400) });
   return { ok: true, mode: 'console' };
 }
 

@@ -1,9 +1,11 @@
 import 'dotenv/config';
 
-// Vercel serverless: project dir is read-only; SQLite and uploads must use /tmp.
-if (process.env.VERCEL === '1') {
-  const d = (process.env.DATABASE_URL || '').trim();
-  if (!d || d.startsWith('file:./') || d.includes('/data/')) {
-    process.env.DATABASE_URL = 'file:/tmp/signproz.db';
-  }
+/**
+ * Database: PostgreSQL only (Prisma). Required for Vercel serverless — SQLite is not viable there.
+ * Use Neon (free), Supabase, or Vercel Postgres. Set DATABASE_URL in .env locally and in Vercel.
+ */
+if (!process.env.DATABASE_URL?.trim()) {
+  console.warn(
+    '[env] DATABASE_URL is not set. Set it to a PostgreSQL connection string (e.g. from neon.tech).'
+  );
 }

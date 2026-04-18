@@ -9,6 +9,23 @@ const router = Router();
 const OTP_TTL_MS = 10 * 60 * 1000;
 const bypassOtp = process.env.BYPASS_OTP !== 'false' && process.env.BYPASS_OTP !== '0';
 
+function authErrorResponse(res, e) {
+  console.error(e);
+  const code = e?.code;
+  if (code === 'P1001' || code === 'P1017') {
+    return res.status(503).json({
+      error:
+        'Database is not reachable. Set DATABASE_URL to PostgreSQL (e.g. Neon) in your environment.',
+    });
+  }
+  if (code === 'P2021' || code === 'P2022') {
+    return res.status(503).json({
+      error: 'Database schema is missing. Run: npx prisma migrate deploy (and ensure DATABASE_URL is set).',
+    });
+  }
+  return res.status(500).json({ error: 'Server error' });
+}
+
 function randomOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -57,8 +74,7 @@ router.post('/signup/request', async (req, res) => {
     else console.log('[auth] BYPASS_OTP: signup email skipped for', em);
     res.json({ ok: true, message: 'Verification code sent', bypassOtp });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
+    return authErrorResponse(res, e);
   }
 });
 
@@ -130,8 +146,7 @@ router.post('/signup/verify', async (req, res) => {
       user: publicUser(user),
     });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
+    return authErrorResponse(res, e);
   }
 });
 
@@ -165,8 +180,7 @@ router.post('/login/request', async (req, res) => {
     else console.log('[auth] BYPASS_OTP: login email skipped for', em);
     res.json({ ok: true, message: 'Verification code sent', bypassOtp });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
+    return authErrorResponse(res, e);
   }
 });
 
@@ -196,8 +210,7 @@ router.post('/login/verify', async (req, res) => {
     const token = signUserToken(user);
     res.json({ token, user: publicUser(user) });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
+    return authErrorResponse(res, e);
   }
 });
 
