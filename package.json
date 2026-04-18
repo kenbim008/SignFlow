@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "build": "prisma generate && prisma migrate deploy",
+    "build": "node scripts/ensure-vercel-db.mjs && prisma generate && prisma migrate deploy",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:create": "prisma migrate deploy",
