@@ -1,12 +1,10 @@
 import type { NextConfig } from 'next';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/** Monorepo: parent SignFlow has its own package-lock; trace from repo root. */
-const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname, '..'),
-};
+/**
+ * Do not set outputFileTracingRoot to the parent repo here: when this app is
+ * deployed with Vercel’s Root Directory = `web/`, that breaks file tracing
+ * (duplicate path segments / missing routes-manifest).
+ */
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
