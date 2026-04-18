@@ -87,6 +87,26 @@ async function ensureInit() {
 }
 
 const app = express();
+
+// Vercel rewrites /signproz-api/* → /api?__op=/signproz-api/... so POST hits this function.
+// Restore the real path before routes run (otherwise req.url stays /api and all API routes 404).
+app.use((req, _res, next) => {
+  if (process.env.VERCEL !== '1') return next();
+  try {
+    const host = req.headers.host || 'localhost';
+    const u = new URL(req.url, `http://${host}`);
+    const op = u.searchParams.get('__op');
+    if (op && op.startsWith('/signproz-api')) {
+      u.searchParams.delete('__op');
+      const q = u.searchParams.toString();
+      req.url = op + (q ? `?${q}` : '');
+    }
+  } catch (e) {
+    console.error('[vercel] url restore failed', e);
+  }
+  next();
+});
+
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '12mb' }));
 
@@ -108,7 +128,8 @@ app.use('/signproz-api/admin', adminRoutes);
 
 app.get('/signproz-api/health', (_req, res) => res.json({ ok: true, service: 'signproz' }));
 
-if (fs.existsSync(publicDir)) {
+// On Vercel, static HTML and assets are served by the CDN; only /api (this app) is invoked.
+if (fs.existsSync(publicDir) && process.env.VERCEL !== '1') {
   const sendDemo = (_req, res) => {
     const demo = path.join(publicDir, 'demo.html');
     if (fs.existsSync(demo)) return res.sendFile(demo);
