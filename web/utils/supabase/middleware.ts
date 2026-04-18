@@ -5,21 +5,17 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 /**
- * Refreshes the Supabase session on each matched request so Server Components
- * receive up-to-date cookies. Use this from the root `middleware.ts`.
+ * Middleware Supabase client — refreshes the session (must call getUser after createServerClient).
+ * Root `middleware.ts` should `return await createClient(request)`.
  */
-export async function updateSession(request: NextRequest) {
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.next({ request });
-  }
-
+export const createClient = async (request: NextRequest) => {
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
 
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -36,8 +32,7 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  // Important: do not add logic between createServerClient and getUser().
   await supabase.auth.getUser();
 
   return supabaseResponse;
-}
+};
